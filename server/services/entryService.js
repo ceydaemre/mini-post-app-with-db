@@ -9,6 +9,7 @@ const {
 const {
     getOriginalEntry
 } = require("./helpers/entryQueries");
+const { toggleEntryRepost } = require("../controllers/entryController");
 
 const VALID_ENTRY_TYPES = ["POST", "COMMENT", "REPOST", "QUOTE"];
 
@@ -447,10 +448,118 @@ async function hydrateTimelineEntryCardByEntryIdService(entry_id) {
   throw new Error("Desteklenmeyen entry type.");
 }
 
+async function toggleEntryLikeService(user_id, entry_id) {
+    const entryQuery = `
+        SELECT *
+        FROM entries
+        WHERE id = $1
+    `;
+
+    const entryResult = await pool.query(entryQuery, [ entry_id ]);
+
+    if(entryResult.rows.length === 0) {
+        throw new Error("Gönderi bulunamadı");
+    }
+
+    const likeQuery = `
+        SELECT * 
+        FROM entry_likes
+        WHERE user_id = $1 
+        AND entry_id = $2
+    `;
+
+    const likeResult = await pool.query(likeQuery, [ user_id, entry_id ]);
+
+    if(likeResult.rows.length > 0) {
+        const deleteLikeQuery = `
+            DELETE FROM entry_likes
+            WHERE user_id = $1
+            AND entry_id = $2
+        `;
+
+        const deleteLikeResult = await pool.query(deleteLikeQuery, [ user_id, entry_id ]);
+
+        return {
+            entry_id,
+            is_liked_by_me: false
+        }
+    }
+
+    if(likeResult.rows.length === 0) {
+        const likeEntryQuery = `
+            INSERT INTO entry_likes
+            (user_id, entry_id)
+            VALUES ($1, $2)
+        `;
+
+        const likeEntryResult = await pool.query(likeEntryQuery, [ user_id, entry_id ]);
+
+        return {
+            entry_id,
+            is_liked_by_me : true
+        };
+    }
+}
+
+async function toggleEntryRepostService(user_id, original_entry_id) {
+    const originalEntryQuery = `
+        SELECT *
+        FROM entries
+        WHERE id = $1
+    `;
+
+    const OriginalEntryResult = await pool.query(originalEntryQuery, [ original_entry_id ]);
+
+    if(OriginalEntryResult.rows.length === 0) {
+        throw new Error("Gönderi bulunamadı");
+    }
+
+    const repostQuery = `
+        SELECT *
+        FROM entries
+        WHERE type = 'REPOST'
+        AND user_id = $1
+        AND original_entry_id = $2
+    `;
+
+    const repostResult = await pool.query(repostQuery, [user_id, original_entry_id]);
+
+    if(repostResult.rows.length > 0) {
+        const deleteRepostQuery = `
+            DELETE FROM entries
+            WHERE type = 'REPOST'
+            AND user_id = $1
+            AND original_entry_id = $2
+        `;
+
+        const deleteRepostResult = await pool.query(deleteRepostQuery, [user_id, original_entry_id]);
+
+        return {
+            original_entry_id,
+            is_reposted_by_me : false
+        }
+    } else {
+        const repostEntryQuery = `
+            INSERT INTO entries
+            (user_id, type, content, parent_entry_id, original_entry_id)
+            VALUES ($1, $2, $3, $4, $5)
+        `;
+
+        const repostEntryResult = await pool.query(repostEntryQuery, [ user_id, 'REPOST', null, null, original_entry_id]);
+
+        return {
+            original_entry_id,
+            is_reposted_by_me : true
+        }
+    }
+}
+
 module.exports = {
-  createEntryService,
-  getEntryDetailByEntryIdService,
-  hydrateEntryCardByEntryIdService,
-  getTimelineEntriesService,
-  hydrateTimelineEntryCardByEntryIdService,
+    createEntryService,
+    getEntryDetailByEntryIdService,
+    hydrateEntryCardByEntryIdService,
+    getTimelineEntriesService,
+    hydrateTimelineEntryCardByEntryIdService,
+    toggleEntryLikeService,
+    toggleEntryRepostService
 };

@@ -2,6 +2,8 @@ const {
     createEntryService,
     getEntryDetailByEntryIdService,
     getTimelineEntriesService,
+    toggleEntryLikeService,
+    toggleEntryRepostService
 } = require("../services/entryService");
 
 async function createPost(req, res) {
@@ -155,7 +157,7 @@ async function getEntryDetailByEntryId(req, res) {
 
     } catch (error) {
 
-        console.error("getEntryDetailByEntryId controller hatası:", error.message);
+        console.error("getEntryDetailByEntryId controller hatası : ", error.message);
 
         return res.status(400).json({
             message: error.message,
@@ -197,7 +199,7 @@ async function getTimelineEntries(req, res) {
 
     } catch (error) {
 
-        console.error("getTimelineEntries controller hatası:", error.message);
+        console.error("getTimelineEntries controller hatası : ", error.message);
 
         return res.status(400).json({
             message: error.message,
@@ -205,6 +207,75 @@ async function getTimelineEntries(req, res) {
   }
 }
 
+async function toggleEntryLike(req, res) {
+    try{
+        const user_id = req.user.id;
+        const entry_id = Number(req.params.id);
+
+        if(Number.isNaN(entry_id)){
+            return res.status(400).json({
+                message : "Geçersiz entry_id."
+            });
+        }
+
+        const result = await toggleEntryLikeService(user_id, entry_id);
+
+        if(result.is_liked_by_me === true) {
+
+            return res.status(200).json({
+                message : "Gönderi beğenildi.",
+                data : result
+            });
+        } else {
+
+            return res.status(200).json({
+                message : "Gönderi beğenisi geri alındı.",
+                data : result
+            });
+        }
+
+    } catch(error) {
+
+        console.error("toggleEntryLike controller hatası : ", error.message);
+
+        return res.status(400).json({
+            mesage : error.message
+        });
+    }
+}
+async function toggleEntryRepost(req, res) {
+    try {
+        const user_id = req.user.id;
+        const original_entry_id = Number(req.params.id);
+
+        if(Number.isNaN(original_entry_id)) {
+            return res.status(400).json({
+                message : "Geçersiz entry_id."
+            });
+        }
+
+        const result = await toggleEntryRepostService(user_id, original_entry_id);
+
+        if(result.is_reposted_by_me === true) {
+            return res.status(200).json({
+                message : "Gönderi repostlandı.",
+                data : result
+            });
+        } else {
+            return res.status(200).json({
+                message : "Gönderi repost'u geri alındı."
+            });
+        }
+
+    } catch(error) {
+        
+        console.error("toggleEntryRepost controller hatası : ", error.message);
+
+        return res.status(400).json({
+            message : error.message
+        });
+    }
+}
 module.exports = {
     createPost,
     createComment,
@@ -212,4 +283,6 @@ module.exports = {
     createQuote,
     getEntryDetailByEntryId,
     getTimelineEntries,
+    toggleEntryLike,
+    toggleEntryRepost
 };

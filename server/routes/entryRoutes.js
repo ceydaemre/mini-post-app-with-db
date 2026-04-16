@@ -7,7 +7,9 @@ const {
     createRepost,
     createQuote,
     getEntryDetailByEntryId,
-    getTimelineEntries
+    getTimelineEntries,
+    toggleEntryLike,
+    toggleEntryRepost
 } = require("../controllers/entryController");
 
 const {
@@ -21,6 +23,9 @@ router.post("/:id/quote", authMiddleware, createQuote);
 
 router.get("/", getTimelineEntries);
 router.get("/:id", getEntryDetailByEntryId);
+
+router.patch("/:id/like", authMiddleware, toggleEntryLike);
+router.patch("/:id/repost", authMiddleware, toggleEntryRepost);
 
 
 module.exports = router;
