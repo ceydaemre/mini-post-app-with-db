@@ -1,6 +1,7 @@
 const pool = require("../config/db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { hydrateEntryCardByEntryIdService, hydrateTimelineEntryCardByEntryIdService } = require("./entryService");
 
 async function registerUserService({ full_name, username, email, password }) {
     if(!full_name || String(full_name).trim() === "") {
@@ -112,9 +113,9 @@ async function loginUserService({email, password}) {
         token
     };
 }
+
 module.exports = {
   registerUserService,
-  loginUserService
+  loginUserService,
 };
 
-jwt.sign({},process.env.JWT_SECRET,{})
