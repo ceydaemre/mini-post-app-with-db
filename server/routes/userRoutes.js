@@ -19,5 +19,7 @@ router.get("/:id/likes", authMiddleware, getUserLikes);
 router.get("/:id/profile", optionalAuthMiddleware, getUserProfile);
 router.get("/:id/posts", optionalAuthMiddleware, getUserPosts);
 router.get("/:id/replies", optionalAuthMiddleware, getUserReplies);
+router.get("/:id/likes", authMiddleware, getUserLikes);
+
 
 module.exports = router;

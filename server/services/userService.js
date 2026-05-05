@@ -5,8 +5,14 @@ const {
 const {
     buildPaginationMeta
 } = require("./helpers/pagination");
+const {
+    createNotificationService
+} = require("./notificationsService");
 
 async function toggleFollowService(follower_id, following_id) {
+    follower_id = Number(follower_id);
+    following_id = Number(following_id);
+
     if (!Number.isInteger(follower_id) || follower_id < 1) {
         throw new Error("Geçersiz follower_id.");
     }
@@ -65,12 +71,18 @@ async function toggleFollowService(follower_id, following_id) {
 
     await pool.query(followUserQuery, [follower_id, following_id]);
 
+    await createNotificationService({
+        receiver_user_id: Number(following_id),
+        actor_user_id: Number(follower_id),
+        type: "FOLLOW",
+        entry_id: null
+    });
+
     return {
         following_id,
         is_following: true
     };
 }
-
 async function getUserProfileService(profile_user_id, current_user_id = null) {
     if (!Number.isInteger(profile_user_id) || profile_user_id < 1) {
         throw new Error("Geçersiz profile_user_id.");
@@ -357,6 +369,76 @@ async function getUserLikesService(profile_user_id, current_user_id, limit = 10,
         limit,
         offset,
         rawLikesResult.rows.length,
+        hydratedLikes.length
+    );
+
+    return {
+        items: hydratedLikes,
+        pagination
+    };
+}
+
+async function getUserLikesService(profile_user_id, current_user_id, limit = 10, offset = 0) {
+    if (!Number.isInteger(profile_user_id) || profile_user_id < 1) {
+        throw new Error("Geçersiz profile_user_id.");
+    }
+
+    if (!Number.isInteger(current_user_id) || current_user_id < 1) {
+        throw new Error("Geçersiz current_user_id.");
+    }
+
+    if (!Number.isInteger(limit) || limit < 1) {
+        throw new Error("Geçersiz limit.");
+    }
+
+    if (!Number.isInteger(offset) || offset < 0) {
+        throw new Error("Geçersiz offset.");
+    }
+
+    const profileUserQuery = `
+        SELECT 1
+        FROM users
+        WHERE id = $1
+    `;
+
+    const profileUserResult = await pool.query(profileUserQuery, [profile_user_id]);
+
+    if (profileUserResult.rows.length === 0) {
+        throw new Error("Kullanıcı bulunamadı.");
+    }
+
+    const userLikesQuery = `
+        SELECT entry_id
+        FROM entry_likes
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2
+        OFFSET $3
+    `;
+
+    const rawLikesResult = await pool.query(userLikesQuery, [
+        profile_user_id,
+        limit + 1,
+        offset
+    ]);
+
+    const rawLikes = rawLikesResult.rows;
+
+    const selectedLikes = rawLikes.slice(0, limit);
+
+    const hydratedLikes = await Promise.all(
+        selectedLikes.map(async (like) => {
+            return await hydrateTimelineEntryCardByEntryIdService(
+                like.entry_id,
+                current_user_id
+            );
+        })
+    );
+
+    const pagination = buildPaginationMeta(
+        limit,
+        offset,
+        rawLikes.length,
         hydratedLikes.length
     );
 

@@ -10,6 +10,7 @@ const {
     getTimelineEntries,
     toggleEntryLike,
     toggleEntryRepost,
+    getEntryLikes
 } = require("../controllers/entryController");
 
 const {
@@ -24,6 +25,7 @@ router.post("/:id/quote", authMiddleware, createQuote);
 
 router.get("/", authMiddleware, getTimelineEntries);
 router.get("/:id", optionalAuthMiddleware, getEntryDetailByEntryId);
+router.get("/:id/likes", authMiddleware, getEntryLikes);
 
 router.patch("/:id/like", authMiddleware, toggleEntryLike);
 router.patch("/:id/repost", authMiddleware, toggleEntryRepost);

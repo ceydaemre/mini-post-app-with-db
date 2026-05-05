@@ -3,6 +3,7 @@ const pool = require("../config/db");
 const {
     buildCardHeader,
     buildRepostInfo,
+    buildEntryDetailResponse,
 } = require("./helpers/entryBuilders");
 
 const {
@@ -11,17 +12,112 @@ const {
 
 const { 
     buildPaginationMeta,
-    buildCursorPaginationMeta
+    buildCursorPaginationMeta,
 } = require("./helpers/pagination");
+const {
+    createNotificationService
+} = require("./notificationsService");
 
 const VALID_ENTRY_TYPES = ["POST", "COMMENT", "REPOST", "QUOTE"];
 
+const VALID_MEDIA_TYPES = ["image", "video", "gif"];
+
+async function getRootEntryByEntryService(entry, current_user_id = null) {
+    let currentEntry = entry;
+
+    while (currentEntry.parent_entry_id !== null) {
+        const rootEntryQuery = `
+            SELECT *
+            FROM entries
+            WHERE id = $1
+        `;
+
+        const rootEntryResult = await pool.query(rootEntryQuery, [
+            currentEntry.parent_entry_id
+        ]);
+
+        if (rootEntryResult.rows.length === 0) {
+            throw new Error("Parent entry bulunamadı.");
+        }
+
+        currentEntry = rootEntryResult.rows[0];
+    }
+
+    return await hydrateEntryCardByEntryIdService(
+        currentEntry.id,
+        current_user_id
+    );
+}
+async function getParentChainByEntryIdService(entry, current_user_id = null) {
+    let currentEntry = entry;
+    const temporaryParentEntries = [];
+
+    while (currentEntry.parent_entry_id !== null) {
+        const parentQuery = `
+            SELECT *
+            FROM entries
+            WHERE id = $1
+        `;
+
+        const parentResult = await pool.query(parentQuery, [
+            currentEntry.parent_entry_id
+        ]);
+
+        if (parentResult.rows.length === 0) {
+            throw new Error("Parent entry bulunamadı.");
+        }
+
+        const parent = parentResult.rows[0];
+        temporaryParentEntries.push(parent);
+        currentEntry = parent;
+    }
+
+    if (temporaryParentEntries.length > 0) {
+        temporaryParentEntries.pop();
+    }
+
+    temporaryParentEntries.reverse();
+
+    const hydratedParentChain = await Promise.all(
+        temporaryParentEntries.map(async (parent) => {
+            return await hydrateEntryCardByEntryIdService(
+                parent.id,
+                current_user_id
+            );
+        })
+    );
+
+    return hydratedParentChain;
+}
+
+async function getChildrenByEntryIdService(entry_id, current_user_id = null) {
+    const childrenQuery = `
+        SELECT *
+        FROM entries
+        WHERE parent_entry_id = $1
+        ORDER BY created_at ASC
+    `;
+
+    const childrenResult = await pool.query(childrenQuery, [entry_id]);
+
+    const hydratedChildren = await Promise.all(
+        childrenResult.rows.map(async (child) => {
+            return await hydrateEntryCardByEntryIdService(
+                child.id,
+                current_user_id
+            );
+        })
+    );
+
+    return hydratedChildren;
+}
 async function createEntryService({
     user_id,
     type,
     content,
     parent_entry_id,
     original_entry_id,
+    media = []
 }) {
     if (!user_id) {
         throw new Error("user_id zorunludur.");
@@ -34,6 +130,35 @@ async function createEntryService({
     if (!VALID_ENTRY_TYPES.includes(type)) {
         throw new Error("Geçersiz entry type.");
     }
+
+    if (media === undefined) {
+        media = [];
+    }
+
+    if (!Array.isArray(media)) {
+        throw new Error("Geçersiz media.");
+    }
+
+    const normalizedMedia = media.map((mediaItem) => {
+        if (typeof mediaItem !== "object" || mediaItem === null) {
+            throw new Error("Geçersiz media item.");
+        }
+
+        if (!mediaItem.media_url || String(mediaItem.media_url).trim() === "") {
+            throw new Error("media_url zorunludur.");
+        }
+
+        const media_type = mediaItem.media_type || "image";
+
+        if (!VALID_MEDIA_TYPES.includes(media_type)) {
+            throw new Error("Geçersiz media_type.");
+        }
+
+        return {
+            media_url: String(mediaItem.media_url).trim(),
+            media_type
+        };
+    });
 
     const has_content =
         content !== null &&
@@ -76,6 +201,10 @@ async function createEntryService({
         if (has_content) {
             throw new Error("REPOST için content boş olmalıdır.");
         }
+
+        if (normalizedMedia.length > 0) {
+            throw new Error("REPOST için media boş olmalıdır.");
+        }
     }
 
     if (type === "QUOTE") {
@@ -108,9 +237,73 @@ async function createEntryService({
 
     const result = await pool.query(query, values);
 
-    return result.rows[0];
-}
+    const createdEntry = result.rows[0];
 
+    if (type === "COMMENT") {
+        const parentEntryQuery = `
+            SELECT user_id
+            FROM entries
+            WHERE id = $1
+        `;
+
+        const parentEntryResult = await pool.query(parentEntryQuery, [
+            parent_entry_id
+        ]);
+
+        if (parentEntryResult.rows.length > 0) {
+            await createNotificationService({
+                receiver_user_id: Number(parentEntryResult.rows[0].user_id),
+                actor_user_id: Number(user_id),
+                type: "COMMENT",
+                entry_id: Number(createdEntry.id)
+            });
+        }
+    }
+
+    if (type === "QUOTE") {
+        const originalEntryQuery = `
+            SELECT user_id
+            FROM entries
+            WHERE id = $1
+        `;
+
+        const originalEntryResult = await pool.query(originalEntryQuery, [
+            original_entry_id
+        ]);
+
+        if (originalEntryResult.rows.length > 0) {
+            await createNotificationService({
+                receiver_user_id: Number(originalEntryResult.rows[0].user_id),
+                actor_user_id: Number(user_id),
+                type: "QUOTE",
+                entry_id: Number(createdEntry.id)
+            });
+        }
+    }
+
+    const insertedMedia = [];
+
+    for (const mediaItem of normalizedMedia) {
+        const mediaInsertQuery = `
+            INSERT INTO entry_media (entry_id, media_url, media_type)
+            VALUES ($1, $2, $3)
+            RETURNING id, entry_id, media_url, media_type, created_at
+        `;
+
+        const mediaInsertResult = await pool.query(mediaInsertQuery, [
+            createdEntry.id,
+            mediaItem.media_url,
+            mediaItem.media_type
+        ]);
+
+        insertedMedia.push(mediaInsertResult.rows[0]);
+    }
+
+    return {
+        ...createdEntry,
+        media: insertedMedia
+    };
+}
 async function getEntryDetailByEntryIdService(entry_id, current_user_id = null) {
     const selectedEntryQuery = `
         SELECT *
@@ -127,88 +320,67 @@ async function getEntryDetailByEntryIdService(entry_id, current_user_id = null) 
     const selectedEntry = selectedEntryResult.rows[0];
 
     if (selectedEntry.type === "POST") {
-        const hydratedEntry = await hydrateEntryCardByEntryIdService(selectedEntry.id, current_user_id);
-
-        const childrenQuery = `
-            SELECT *
-            FROM entries
-            WHERE parent_entry_id = $1
-            ORDER BY created_at ASC
-        `;
-
-        const childrenResult = await pool.query(childrenQuery, [selectedEntry.id]);
-
-        const hydratedChildren = await Promise.all(
-            childrenResult.rows.map(async (child) => {
-                return await hydrateEntryCardByEntryIdService(child.id, current_user_id);
-            })
+        const hydratedEntry = await hydrateEntryCardByEntryIdService(
+            selectedEntry.id,
+            current_user_id
         );
 
-        return {
-            entry_type: selectedEntry.type,
-            entry: hydratedEntry,
-            children: hydratedChildren,
-        };
+        const children = await getChildrenByEntryIdService(
+            selectedEntry.id,
+            current_user_id
+        );
+
+        return buildEntryDetailResponse(
+            selectedEntry.type,
+            hydratedEntry,
+            null,
+            [],
+            children
+        );
     }
 
     if (selectedEntry.type === "COMMENT") {
-        const hydratedEntry = await hydrateEntryCardByEntryIdService(selectedEntry.id, current_user_id);
-
-        const childrenQuery = `
-            SELECT *
-            FROM entries
-            WHERE parent_entry_id = $1
-            ORDER BY created_at ASC
-        `;
-
-        const childrenResult = await pool.query(childrenQuery, [selectedEntry.id]);
-
-        let currentEntry = selectedEntry;
-
-        while (currentEntry.parent_entry_id !== null) {
-            const parentQuery = `
-                SELECT *
-                FROM entries
-                WHERE id = $1
-            `;
-
-            const parentResult = await pool.query(parentQuery, [currentEntry.parent_entry_id]);
-
-            if (parentResult.rows.length === 0) {
-                break;
-            }
-
-            currentEntry = parentResult.rows[0];
-        }
-
-        const rootContext = currentEntry;
-        const hydratedRootContext = await hydrateEntryCardByEntryIdService(rootContext.id, current_user_id);
-
-        const hydratedChildren = await Promise.all(
-            childrenResult.rows.map(async (child) => {
-                return await hydrateEntryCardByEntryIdService(child.id, current_user_id);
-            })
+        const hydratedEntry = await hydrateEntryCardByEntryIdService(
+            selectedEntry.id,
+            current_user_id
         );
 
-        return {
-            entry_type: selectedEntry.type,
-            entry: hydratedEntry,
-            children: hydratedChildren,
-            root_context: hydratedRootContext,
-        };
+        const root_context = await getRootEntryByEntryService(
+            selectedEntry,
+            current_user_id
+        );
+
+        const parent_chain = await getParentChainByEntryIdService(
+            selectedEntry,
+            current_user_id
+        );
+
+        const children = await getChildrenByEntryIdService(
+            selectedEntry.id,
+            current_user_id
+        );
+
+        return buildEntryDetailResponse(
+            selectedEntry.type,
+            hydratedEntry,
+            root_context,
+            parent_chain,
+            children
+        );
     }
 
     if (selectedEntry.type === "REPOST") {
         const originalEntry = await getOriginalEntry(selectedEntry);
 
-        const childrenQuery = `
-            SELECT *
-            FROM entries
-            WHERE parent_entry_id = $1
-            ORDER BY created_at ASC
-        `;
+        const hydratedEntry = await hydrateEntryCardByEntryIdService(
+            originalEntry.id,
+            current_user_id
+        );
 
-        const childrenResult = await pool.query(childrenQuery, [originalEntry.id]);
+        const children = await getChildrenByEntryIdService(
+            originalEntry.id,
+            current_user_id
+        );
 
         const repostUserQuery = `
             SELECT *
@@ -216,7 +388,10 @@ async function getEntryDetailByEntryIdService(entry_id, current_user_id = null) 
             WHERE id = $1
         `;
 
-        const repostUserResult = await pool.query(repostUserQuery, [selectedEntry.user_id]);
+        const repostUserResult = await pool.query(
+            repostUserQuery,
+            [selectedEntry.user_id]
+        );
 
         if (repostUserResult.rows.length === 0) {
             throw new Error("Kullanıcı bulunamadı.");
@@ -224,18 +399,14 @@ async function getEntryDetailByEntryIdService(entry_id, current_user_id = null) 
 
         const reposter = repostUserResult.rows[0];
 
-        const hydratedEntry = await hydrateEntryCardByEntryIdService(originalEntry.id, current_user_id);
-
-        const hydratedChildren = await Promise.all(
-            childrenResult.rows.map(async (child) => {
-                return await hydrateEntryCardByEntryIdService(child.id, current_user_id);
-            })
-        );
-
         return {
-            entry_type: selectedEntry.type,
-            entry: hydratedEntry,
-            children: hydratedChildren,
+            ...buildEntryDetailResponse(
+                selectedEntry.type,
+                hydratedEntry,
+                null,
+                [],
+                children
+            ),
             repost_info: {
                 repost_entry_id: selectedEntry.id,
                 reposter: {
@@ -249,32 +420,32 @@ async function getEntryDetailByEntryIdService(entry_id, current_user_id = null) 
     }
 
     if (selectedEntry.type === "QUOTE") {
-        const originalEntry = await getOriginalEntry(selectedEntry);
-
-        const childrenQuery = `
-            SELECT *
-            FROM entries
-            WHERE parent_entry_id = $1
-            ORDER BY created_at ASC
-        `;
-
-        const childrenResult = await pool.query(childrenQuery, [selectedEntry.id]);
-
-        const hydratedEntry = await hydrateEntryCardByEntryIdService(selectedEntry.id, current_user_id);
-
-        const hydratedChildren = await Promise.all(
-            childrenResult.rows.map(async (child) => {
-                return await hydrateEntryCardByEntryIdService(child.id, current_user_id);
-            })
+        const hydratedEntry = await hydrateEntryCardByEntryIdService(
+            selectedEntry.id,
+            current_user_id
         );
 
-        const embeddedOriginalEntry = await hydrateEntryCardByEntryIdService(originalEntry.id, current_user_id);
+        const originalEntry = await getOriginalEntry(selectedEntry);
+
+        const embedded_original_entry = await hydrateEntryCardByEntryIdService(
+            originalEntry.id,
+            current_user_id
+        );
+
+        const children = await getChildrenByEntryIdService(
+            selectedEntry.id,
+            current_user_id
+        );
 
         return {
-            entry_type: selectedEntry.type,
-            entry: hydratedEntry,
-            embedded_original_entry: embeddedOriginalEntry,
-            children: hydratedChildren,
+            ...buildEntryDetailResponse(
+                selectedEntry.type,
+                hydratedEntry,
+                null,
+                [],
+                children
+            ),
+            embedded_original_entry
         };
     }
 
@@ -336,6 +507,16 @@ async function hydrateEntryCardByEntryIdService(entry_id, current_user_id = null
     const repostsResult = await pool.query(repostsQuery, [entry.id]);
     const repostsCount = Number(repostsResult.rows[0].count);
 
+    const mediaQuery = `
+        SELECT id, entry_id, media_url, media_type, created_at
+        FROM entry_media
+        WHERE entry_id = $1
+        ORDER BY created_at ASC, id ASC
+    `;
+
+    const mediaResult = await pool.query(mediaQuery, [entry.id]);
+    const media = mediaResult.rows;
+
     let is_liked_by_me = false;
     let is_reposted_by_me = false;
 
@@ -377,6 +558,7 @@ async function hydrateEntryCardByEntryIdService(entry_id, current_user_id = null
             username: author.username,
             profile_image_url: author.profile_image_url,
         },
+        media,
         stats: {
             likes_count: likesCount,
             comments_count: commentsCount,
@@ -389,7 +571,14 @@ async function hydrateEntryCardByEntryIdService(entry_id, current_user_id = null
     };
 }
 
-async function getTimelineEntriesService(feed_type, limit, cursor_created_at, cursor_id, current_user_id) {
+async function getTimelineEntriesService(
+    feed_type,
+    limit,
+    cursor_created_at,
+    cursor_id,
+    current_user_id,
+    cursor_score = null
+) {
     if (feed_type !== "foryou" && feed_type !== "following") {
         throw new Error("Geçersiz feed_type.");
     }
@@ -402,59 +591,149 @@ async function getTimelineEntriesService(feed_type, limit, cursor_created_at, cu
         throw new Error("Geçersiz current_user_id.");
     }
 
-    const hasCursor =
-        cursor_created_at !== null &&
-        cursor_id !== null;
+    const hasCreatedAtCursor = cursor_created_at !== null;
+    const hasIdCursor = cursor_id !== null && cursor_id !== undefined;
+    const hasScoreCursor = cursor_score !== null && cursor_score !== undefined;
 
-    if (hasCursor) {
+    if (hasCreatedAtCursor) {
         if (Number.isNaN(new Date(cursor_created_at).getTime())) {
             throw new Error("Geçersiz cursor_created_at.");
         }
+    }
 
+    if (hasIdCursor) {
         if (!Number.isInteger(cursor_id) || cursor_id < 1) {
             throw new Error("Geçersiz cursor_id.");
+        }
+    }
+
+    if (hasScoreCursor) {
+        if (Number.isNaN(Number(cursor_score))) {
+            throw new Error("Geçersiz cursor_score.");
         }
     }
 
     let rawEntriesResult;
 
     if (feed_type === "foryou") {
+        const hasCursor =
+            hasScoreCursor &&
+            hasCreatedAtCursor &&
+            hasIdCursor;
+
         if (!hasCursor) {
             const forYouQuery = `
+                WITH ranked_entries AS (
+                    SELECT
+                        e.*,
+                        (
+                            (
+                                SELECT COUNT(*)
+                                FROM entry_likes el
+                                WHERE el.entry_id = e.id
+                            ) * 2
+                            +
+                            (
+                                SELECT COUNT(*)
+                                FROM entries c
+                                WHERE c.parent_entry_id = e.id
+                            ) * 3
+                            +
+                            (
+                                SELECT COUNT(*)
+                                FROM entries r
+                                WHERE r.original_entry_id = e.id
+                                  AND r.type IN ('REPOST', 'QUOTE')
+                            ) * 4
+                            +
+                            GREATEST(
+                                0,
+                                100 - EXTRACT(EPOCH FROM (NOW() - e.created_at)) / 3600
+                            )
+                        ) AS score
+                    FROM entries e
+                )
                 SELECT *
-                FROM entries
-                ORDER BY created_at DESC, id DESC
+                FROM ranked_entries
+                ORDER BY score DESC, created_at DESC, id DESC
                 LIMIT $1
             `;
 
             rawEntriesResult = await pool.query(forYouQuery, [limit + 1]);
+
         } else {
             const forYouCursorQuery = `
+                WITH ranked_entries AS (
+                    SELECT
+                        e.*,
+                        (
+                            (
+                                SELECT COUNT(*)
+                                FROM entry_likes el
+                                WHERE el.entry_id = e.id
+                            ) * 2
+                            +
+                            (
+                                SELECT COUNT(*)
+                                FROM entries c
+                                WHERE c.parent_entry_id = e.id
+                            ) * 3
+                            +
+                            (
+                                SELECT COUNT(*)
+                                FROM entries r
+                                WHERE r.original_entry_id = e.id
+                                  AND r.type IN ('REPOST', 'QUOTE')
+                            ) * 4
+                            +
+                            GREATEST(
+                                0,
+                                100 - EXTRACT(EPOCH FROM (NOW() - e.created_at)) / 3600
+                            )
+                        ) AS score
+                    FROM entries e
+                )
                 SELECT *
-                FROM entries
+                FROM ranked_entries
                 WHERE
-                    created_at < $2
-                    OR (created_at = $2 AND id < $3)
-                ORDER BY created_at DESC, id DESC
-                LIMIT $1
+                    score < $1
+                    OR (
+                        score = $1
+                        AND created_at < $2
+                    )
+                    OR (
+                        score = $1
+                        AND created_at = $2
+                        AND id < $3
+                    )
+                ORDER BY score DESC, created_at DESC, id DESC
+                LIMIT $4
             `;
 
             rawEntriesResult = await pool.query(forYouCursorQuery, [
-                limit + 1,
+                cursor_score,
                 cursor_created_at,
-                cursor_id
+                cursor_id,
+                limit + 1
             ]);
         }
     }
 
     if (feed_type === "following") {
+        const hasCursor =
+            hasCreatedAtCursor &&
+            hasIdCursor;
+
         const followedUsersQuery = `
             SELECT following_id
             FROM user_follows
             WHERE follower_id = $1
         `;
 
-        const followedUsersResult = await pool.query(followedUsersQuery, [current_user_id]);
+        const followedUsersResult = await pool.query(
+            followedUsersQuery,
+            [current_user_id]
+        );
 
         if (followedUsersResult.rows.length === 0) {
             if (!hasCursor) {
@@ -465,7 +744,11 @@ async function getTimelineEntriesService(feed_type, limit, cursor_created_at, cu
                     LIMIT $1
                 `;
 
-                rawEntriesResult = await pool.query(fallbackForYouQuery, [limit + 1]);
+                rawEntriesResult = await pool.query(
+                    fallbackForYouQuery,
+                    [limit + 1]
+                );
+
             } else {
                 const fallbackForYouCursorQuery = `
                     SELECT *
@@ -477,12 +760,16 @@ async function getTimelineEntriesService(feed_type, limit, cursor_created_at, cu
                     LIMIT $1
                 `;
 
-                rawEntriesResult = await pool.query(fallbackForYouCursorQuery, [
-                    limit + 1,
-                    cursor_created_at,
-                    cursor_id
-                ]);
+                rawEntriesResult = await pool.query(
+                    fallbackForYouCursorQuery,
+                    [
+                        limit + 1,
+                        cursor_created_at,
+                        cursor_id
+                    ]
+                );
             }
+
         } else {
             const followedUserIds = followedUsersResult.rows.map(
                 (row) => row.following_id
@@ -498,11 +785,15 @@ async function getTimelineEntriesService(feed_type, limit, cursor_created_at, cu
                     LIMIT $3
                 `;
 
-                rawEntriesResult = await pool.query(followingQuery, [
-                    followedUserIds,
-                    current_user_id,
-                    limit + 1
-                ]);
+                rawEntriesResult = await pool.query(
+                    followingQuery,
+                    [
+                        followedUserIds,
+                        current_user_id,
+                        limit + 1
+                    ]
+                );
+
             } else {
                 const followingCursorQuery = `
                     SELECT *
@@ -521,21 +812,25 @@ async function getTimelineEntriesService(feed_type, limit, cursor_created_at, cu
                     LIMIT $5
                 `;
 
-                rawEntriesResult = await pool.query(followingCursorQuery, [
-                    followedUserIds,
-                    current_user_id,
-                    cursor_created_at,
-                    cursor_id,
-                    limit + 1
-                ]);
+                rawEntriesResult = await pool.query(
+                    followingCursorQuery,
+                    [
+                        followedUserIds,
+                        current_user_id,
+                        cursor_created_at,
+                        cursor_id,
+                        limit + 1
+                    ]
+                );
             }
         }
     }
 
-    const selectedEntries =
-        rawEntriesResult.rows.length > limit
-            ? rawEntriesResult.rows.slice(0, limit)
-            : rawEntriesResult.rows;
+    const rawEntries = rawEntriesResult.rows;
+
+    const has_more = rawEntries.length > limit;
+
+    const selectedEntries = rawEntries.slice(0, limit);
 
     const hydratedEntries = await Promise.all(
         selectedEntries.map(async (entry) => {
@@ -546,15 +841,34 @@ async function getTimelineEntriesService(feed_type, limit, cursor_created_at, cu
         })
     );
 
-    const pagination = buildCursorPaginationMeta(
-        limit,
-        rawEntriesResult.rows.length,
-        hydratedEntries
-    );
+    let next_cursor = null;
+
+    if (has_more && selectedEntries.length > 0) {
+        const lastEntry = selectedEntries[selectedEntries.length - 1];
+
+        if (feed_type === "foryou") {
+            next_cursor = {
+                cursor_score: Number(lastEntry.score),
+                cursor_created_at: lastEntry.created_at,
+                cursor_id: Number(lastEntry.id)
+            };
+        }
+
+        if (feed_type === "following") {
+            next_cursor = {
+                cursor_created_at: lastEntry.created_at,
+                cursor_id: Number(lastEntry.id)
+            };
+        }
+    }
 
     return {
         items: hydratedEntries,
-        pagination
+        pagination: {
+            limit,
+            has_more,
+            next_cursor
+        }
     };
 }
 async function hydrateTimelineEntryCardByEntryIdService(entry_id, current_user_id) {
@@ -625,6 +939,17 @@ async function hydrateTimelineEntryCardByEntryIdService(entry_id, current_user_i
 }
 
 async function toggleEntryLikeService(user_id, entry_id) {
+    user_id = Number(user_id);
+    entry_id = Number(entry_id);
+
+    if (!Number.isInteger(user_id) || user_id < 1) {
+        throw new Error("Geçersiz user_id.");
+    }
+
+    if (!Number.isInteger(entry_id) || entry_id < 1) {
+        throw new Error("Geçersiz entry_id.");
+    }
+
     const entryQuery = `
         SELECT *
         FROM entries
@@ -637,11 +962,13 @@ async function toggleEntryLikeService(user_id, entry_id) {
         throw new Error("Gönderi bulunamadı.");
     }
 
+    const entry = entryResult.rows[0];
+
     const likeQuery = `
         SELECT *
         FROM entry_likes
         WHERE user_id = $1
-        AND entry_id = $2
+          AND entry_id = $2
     `;
 
     const likeResult = await pool.query(likeQuery, [user_id, entry_id]);
@@ -650,14 +977,14 @@ async function toggleEntryLikeService(user_id, entry_id) {
         const deleteLikeQuery = `
             DELETE FROM entry_likes
             WHERE user_id = $1
-            AND entry_id = $2
+              AND entry_id = $2
         `;
 
         await pool.query(deleteLikeQuery, [user_id, entry_id]);
 
         return {
             entry_id,
-            is_liked_by_me: false,
+            is_liked_by_me: false
         };
     }
 
@@ -668,9 +995,15 @@ async function toggleEntryLikeService(user_id, entry_id) {
 
     await pool.query(likeEntryQuery, [user_id, entry_id]);
 
+    await createNotificationService({
+        receiver_user_id: Number(entry.user_id),
+        actor_user_id: Number(user_id),
+        type: "LIKE",
+        entry_id: Number(entry_id)
+    });
     return {
         entry_id,
-        is_liked_by_me: true,
+        is_liked_by_me: true
     };
 }
 
@@ -718,13 +1051,136 @@ async function toggleEntryRepostService(user_id, original_entry_id) {
         VALUES ($1, $2, $3, $4, $5)
     `;
 
-    await pool.query(repostEntryQuery, [user_id, "REPOST", null, null, original_entry_id]);
+    const repostInsertResult = await pool.query(
+    `
+        INSERT INTO entries (user_id, type, content, parent_entry_id, original_entry_id)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+    `,
+        [user_id, "REPOST", null, null, original_entry_id]
+    );
+
+    const repostEntry = repostInsertResult.rows[0];
+
+    await createNotificationService({
+        receiver_user_id: Number(originalEntryResult.rows[0].user_id),
+        actor_user_id: Number(user_id),
+        type: "REPOST",
+        entry_id: Number(repostEntry.id)
+    });
 
     return {
         original_entry_id,
         is_reposted_by_me: true,
     };
 }
+
+async function getEntryLikesService(entry_id, current_user_id, limit = 10, offset = 0) {
+    if (!Number.isInteger(entry_id) || entry_id < 1) {
+        throw new Error("Geçersiz entry_id.");
+    }
+
+    if (!Number.isInteger(current_user_id) || current_user_id < 1) {
+        throw new Error("Geçersiz current_user_id.");
+    }
+
+    if (!Number.isInteger(limit) || limit < 1) {
+        throw new Error("Geçersiz limit.");
+    }
+
+    if (!Number.isInteger(offset) || offset < 0) {
+        throw new Error("Geçersiz offset.");
+    }
+
+    const entryCheckQuery = `
+        SELECT 1
+        FROM entries
+        WHERE id = $1
+    `;
+
+    const entryCheckResult = await pool.query(entryCheckQuery, [entry_id]);
+
+    if (entryCheckResult.rows.length === 0) {
+        throw new Error("Entry bulunamadı.");
+    }
+
+    const likesQuery = `
+        SELECT
+            u.id,
+            u.full_name,
+            u.username,
+            u.profile_image_url,
+            el.created_at AS liked_at
+        FROM entry_likes el
+        INNER JOIN users u
+            ON el.user_id = u.id
+        WHERE el.entry_id = $1
+        ORDER BY el.created_at DESC
+        LIMIT $2
+        OFFSET $3
+    `;
+
+    const likesResult = await pool.query(likesQuery, [
+        entry_id,
+        limit + 1,
+        offset
+    ]);
+
+    const rawUsers = likesResult.rows;
+
+    const has_more = rawUsers.length > limit;
+
+    const paginatedUsers = rawUsers.slice(0, limit);
+
+    const userIds = paginatedUsers.map(user => user.id);
+
+    let followingSet = new Set();
+
+    if (userIds.length > 0) {
+        const followingQuery = `
+            SELECT following_id
+            FROM user_follows
+            WHERE follower_id = $1
+              AND following_id = ANY($2::bigint[])
+        `;
+
+        const followingResult = await pool.query(followingQuery, [
+            current_user_id,
+            userIds
+        ]);
+
+        followingSet = new Set(
+            followingResult.rows.map(row => row.following_id)
+        );
+    }
+
+    const items = paginatedUsers.map(user => {
+        const is_me = Number(user.id) === current_user_id;
+        const is_following = followingSet.has(user.id);
+
+        return {
+            id: user.id,
+            full_name: user.full_name,
+            username: user.username,
+            profile_image_url: user.profile_image_url,
+            liked_at: user.liked_at,
+            is_me,
+            is_following
+        };
+    });
+
+    return {
+        entry_id,
+        items,
+        pagination: {
+            limit,
+            offset,
+            has_more,
+            next_offset: has_more ? offset + limit : null
+        }
+    };
+}
+
 
 module.exports = {
     createEntryService,
@@ -734,4 +1190,5 @@ module.exports = {
     hydrateTimelineEntryCardByEntryIdService,
     toggleEntryLikeService,
     toggleEntryRepostService,
+    getEntryLikesService
 };

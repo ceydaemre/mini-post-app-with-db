@@ -4,6 +4,7 @@ const {
     getTimelineEntriesService,
     toggleEntryLikeService,
     toggleEntryRepostService,
+    getEntryLikesService
 } = require("../services/entryService");
 
 const { 
@@ -21,6 +22,7 @@ async function createPost(req, res) {
             content,
             parent_entry_id: null,
             original_entry_id: null,
+            media: req.body.media
         });
 
         return res.status(201).json({
@@ -54,6 +56,7 @@ async function createComment(req, res) {
             content,
             parent_entry_id,
             original_entry_id: null,
+            media: req.body.media
         });
 
         return res.status(201).json({
@@ -119,6 +122,8 @@ async function createQuote(req, res) {
             content,
             parent_entry_id: null,
             original_entry_id,
+            media: req.body.media
+
         });
 
         return res.status(201).json({
@@ -173,17 +178,30 @@ async function getTimelineEntries(req, res) {
         }
 
         const cursor_created_at = req.query.cursor_created_at || null;
-        const raw_cursor_id = req.query.cursor_id;
 
+        const raw_cursor_id = req.query.cursor_id;
         let cursor_id = null;
 
         if (raw_cursor_id !== undefined) {
             cursor_id = Number(raw_cursor_id);
         }
 
-        if (limit < 1) {
+        const raw_cursor_score = req.query.cursor_score;
+        let cursor_score = null;
+
+        if (raw_cursor_score !== undefined) {
+            cursor_score = Number(raw_cursor_score);
+        }
+
+        if (!Number.isInteger(current_user_id) || current_user_id < 1) {
             return res.status(400).json({
-                message: "Geçersiz limit değeri. 1 veya daha büyük bir değer giriniz.",
+                message: "Geçersiz current_user_id."
+            });
+        }
+
+        if (!Number.isInteger(limit) || limit < 1) {
+            return res.status(400).json({
+                message: "Geçersiz limit değeri. 1 veya daha büyük bir değer giriniz."
             });
         }
 
@@ -195,11 +213,38 @@ async function getTimelineEntries(req, res) {
 
         const has_cursor_created_at = cursor_created_at !== null;
         const has_cursor_id = raw_cursor_id !== undefined;
+        const has_cursor_score = raw_cursor_score !== undefined;
 
-        if (has_cursor_created_at !== has_cursor_id) {
-            return res.status(400).json({
-                message: "cursor_created_at ve cursor_id birlikte gönderilmelidir."
-            });
+        if (feed_type === "foryou") {
+            const has_any_cursor =
+                has_cursor_score ||
+                has_cursor_created_at ||
+                has_cursor_id;
+
+            const has_full_cursor =
+                has_cursor_score &&
+                has_cursor_created_at &&
+                has_cursor_id;
+
+            if (has_any_cursor && !has_full_cursor) {
+                return res.status(400).json({
+                    message: "For You cursor için cursor_score, cursor_created_at ve cursor_id birlikte gönderilmelidir."
+                });
+            }
+
+            if (has_cursor_score && Number.isNaN(cursor_score)) {
+                return res.status(400).json({
+                    message: "Geçersiz cursor_score değeri."
+                });
+            }
+        }
+
+        if (feed_type === "following") {
+            if (has_cursor_created_at !== has_cursor_id) {
+                return res.status(400).json({
+                    message: "Following cursor için cursor_created_at ve cursor_id birlikte gönderilmelidir."
+                });
+            }
         }
 
         if (has_cursor_id && (!Number.isInteger(cursor_id) || cursor_id < 1)) {
@@ -208,7 +253,10 @@ async function getTimelineEntries(req, res) {
             });
         }
 
-        if (has_cursor_created_at && Number.isNaN(new Date(cursor_created_at).getTime())) {
+        if (
+            has_cursor_created_at &&
+            Number.isNaN(new Date(cursor_created_at).getTime())
+        ) {
             return res.status(400).json({
                 message: "Geçersiz cursor_created_at değeri."
             });
@@ -219,19 +267,20 @@ async function getTimelineEntries(req, res) {
             limit,
             cursor_created_at,
             cursor_id,
-            current_user_id
+            current_user_id,
+            cursor_score
         );
 
         return res.status(200).json({
             message: "Timeline getirildi.",
-            data: result,
+            data: result
         });
 
     } catch (error) {
         console.error("getTimelineEntries controller hatası:", error.message);
 
         return res.status(400).json({
-            message: error.message,
+            message: error.message
         });
     }
 }
@@ -301,6 +350,67 @@ async function toggleEntryRepost(req, res) {
     }
 }
 
+async function getEntryLikes(req, res) {
+    try {
+        const entry_id = Number(req.params.id);
+        const current_user_id = Number(req.user.id);
+
+        let limit = Number(req.query.limit);
+        let offset = Number(req.query.offset);
+
+        if (Number.isNaN(limit)) {
+            limit = 10;
+        }
+
+        if (Number.isNaN(offset)) {
+            offset = 0;
+        }
+
+        if (!Number.isInteger(entry_id) || entry_id < 1) {
+            return res.status(400).json({
+                message: "Geçersiz entry_id.",
+            });
+        }
+
+        if (!Number.isInteger(current_user_id) || current_user_id < 1) {
+            return res.status(400).json({
+                message: "Geçersiz current_user_id.",
+            });
+        }
+
+        if (!Number.isInteger(limit) || limit < 1) {
+            return res.status(400).json({
+                message: "Geçersiz limit.",
+            });
+        }
+
+        if (!Number.isInteger(offset) || offset < 0) {
+            return res.status(400).json({
+                message: "Geçersiz offset.",
+            });
+        }
+
+        const result = await getEntryLikesService(
+            entry_id,
+            current_user_id,
+            limit,
+            offset
+        );
+
+        return res.status(200).json({
+            message: "Entry likes getirildi.",
+            data: result
+        });
+
+    } catch(error) {
+        console.error("getEntryLikes controller hatası : ", error.message);
+
+        return res.status(400).json({
+            message: error.message
+        });
+    }
+}
+
 module.exports = {
     createPost,
     createComment,
@@ -310,4 +420,5 @@ module.exports = {
     getTimelineEntries,
     toggleEntryLike,
     toggleEntryRepost,
+    getEntryLikes
 };

@@ -21,4 +21,20 @@ function buildRepostInfo(reposter, repostEntry) {
   };
 }
 
-module.exports = { buildCardHeader, buildRepostInfo };
+function buildEntryDetailResponse(
+    entry_type,
+    entry,
+    root_context = null,
+    parent_chain = [],
+    children = []
+) {
+    return {
+        entry_type,
+        entry,
+        root_context,
+        parent_chain,
+        children
+    };
+}
+
+module.exports = { buildCardHeader, buildRepostInfo, buildEntryDetailResponse };
