@@ -110,6 +110,7 @@ async function searchEntriesService(q, current_user_id = null, limit = 10, offse
         SELECT id
         FROM entries
         WHERE content ILIKE '%' || $1 || '%'
+          AND is_deleted = false
         ORDER BY created_at DESC, id DESC
         LIMIT $2
         OFFSET $3

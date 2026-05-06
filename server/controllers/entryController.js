@@ -4,7 +4,8 @@ const {
     getTimelineEntriesService,
     toggleEntryLikeService,
     toggleEntryRepostService,
-    getEntryLikesService
+    getEntryLikesService,
+    deleteEntryService
 } = require("../services/entryService");
 
 const { 
@@ -411,6 +412,38 @@ async function getEntryLikes(req, res) {
     }
 }
 
+async function deleteEntry(req, res) {
+    try {
+        const user_id = Number(req.user.id);
+        const entry_id = Number(req.params.id);
+
+        if(!Number.isInteger(user_id) || user_id < 1) {
+            return res.status(400).json({
+                message: "Geçersiz user_id."
+            });
+        }
+
+        if(!Number.isInteger(entry_id) || entry_id < 1) {
+            return res.status(400).json({
+                message : "Geçersiz entry_id."
+            });
+        }
+
+        const result = await deleteEntryService(user_id, entry_id);
+
+        return res.status(200).json({
+            message : "Gönderi silindi.",
+            data : result
+        });
+    } catch(error) {
+        console.error("deleteEntry controller hatası : ", error.message);
+
+        return res.status(400).json({
+            message : error.message
+        });
+    }
+}
+
 module.exports = {
     createPost,
     createComment,
@@ -420,5 +453,6 @@ module.exports = {
     getTimelineEntries,
     toggleEntryLike,
     toggleEntryRepost,
-    getEntryLikes
+    getEntryLikes,
+    deleteEntry
 };

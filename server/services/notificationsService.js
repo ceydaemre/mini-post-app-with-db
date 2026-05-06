@@ -13,7 +13,7 @@ async function createNotificationService({
     actor_user_id,
     type,
     entry_id = null
-}) {
+}, db = pool) {
     receiver_user_id = Number(receiver_user_id);
     actor_user_id = Number(actor_user_id);
 
@@ -48,7 +48,7 @@ async function createNotificationService({
         RETURNING *
     `;
 
-    const result = await pool.query(query, [
+    const result = await db.query(query, [
         receiver_user_id,
         actor_user_id,
         type,

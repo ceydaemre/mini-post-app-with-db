@@ -119,8 +119,10 @@ async function createEntryService({
     original_entry_id,
     media = []
 }) {
-    if (!user_id) {
-        throw new Error("user_id zorunludur.");
+    user_id = Number(user_id);
+
+    if (!Number.isInteger(user_id) || user_id < 1) {
+        throw new Error("Geçersiz user_id.");
     }
 
     if (!type) {
@@ -129,6 +131,14 @@ async function createEntryService({
 
     if (!VALID_ENTRY_TYPES.includes(type)) {
         throw new Error("Geçersiz entry type.");
+    }
+
+    if (parent_entry_id !== null && parent_entry_id !== undefined) {
+        parent_entry_id = Number(parent_entry_id);
+    }
+
+    if (original_entry_id !== null && original_entry_id !== undefined) {
+        original_entry_id = Number(original_entry_id);
     }
 
     if (media === undefined) {
@@ -165,9 +175,16 @@ async function createEntryService({
         content !== undefined &&
         String(content).trim() !== "";
 
+    let parentEntry = null;
+    let originalEntry = null;
+
     if (type === "POST") {
-        if (parent_entry_id !== null || original_entry_id !== null) {
-            throw new Error("POST için parent_entry_id ve original_entry_id null olmalıdır.");
+        if (parent_entry_id !== null && parent_entry_id !== undefined) {
+            throw new Error("POST için parent_entry_id null olmalıdır.");
+        }
+
+        if (original_entry_id !== null && original_entry_id !== undefined) {
+            throw new Error("POST için original_entry_id null olmalıdır.");
         }
 
         if (!has_content) {
@@ -180,22 +197,47 @@ async function createEntryService({
             throw new Error("COMMENT için parent_entry_id zorunludur.");
         }
 
-        if (original_entry_id !== null) {
+        if (!Number.isInteger(parent_entry_id) || parent_entry_id < 1) {
+            throw new Error("Geçersiz parent_entry_id.");
+        }
+
+        if (original_entry_id !== null && original_entry_id !== undefined) {
             throw new Error("COMMENT için original_entry_id null olmalıdır.");
         }
 
         if (!has_content) {
             throw new Error("COMMENT için şimdilik content zorunludur.");
         }
+
+        const parentEntryQuery = `
+            SELECT *
+            FROM entries
+            WHERE id = $1
+              AND is_deleted = false
+        `;
+
+        const parentEntryResult = await pool.query(parentEntryQuery, [
+            parent_entry_id
+        ]);
+
+        if (parentEntryResult.rows.length === 0) {
+            throw new Error("Yorum yapılacak gönderi bulunamadı veya silinmiş.");
+        }
+
+        parentEntry = parentEntryResult.rows[0];
     }
 
     if (type === "REPOST") {
-        if (parent_entry_id !== null) {
+        if (parent_entry_id !== null && parent_entry_id !== undefined) {
             throw new Error("REPOST için parent_entry_id null olmalıdır.");
         }
 
         if (original_entry_id === null || original_entry_id === undefined) {
             throw new Error("REPOST için original_entry_id zorunludur.");
+        }
+
+        if (!Number.isInteger(original_entry_id) || original_entry_id < 1) {
+            throw new Error("Geçersiz original_entry_id.");
         }
 
         if (has_content) {
@@ -205,10 +247,27 @@ async function createEntryService({
         if (normalizedMedia.length > 0) {
             throw new Error("REPOST için media boş olmalıdır.");
         }
+
+        const originalEntryQuery = `
+            SELECT *
+            FROM entries
+            WHERE id = $1
+              AND is_deleted = false
+        `;
+
+        const originalEntryResult = await pool.query(originalEntryQuery, [
+            original_entry_id
+        ]);
+
+        if (originalEntryResult.rows.length === 0) {
+            throw new Error("Repost yapılacak gönderi bulunamadı veya silinmiş.");
+        }
+
+        originalEntry = originalEntryResult.rows[0];
     }
 
     if (type === "QUOTE") {
-        if (parent_entry_id !== null) {
+        if (parent_entry_id !== null && parent_entry_id !== undefined) {
             throw new Error("QUOTE için parent_entry_id null olmalıdır.");
         }
 
@@ -216,13 +275,40 @@ async function createEntryService({
             throw new Error("QUOTE için original_entry_id zorunludur.");
         }
 
+        if (!Number.isInteger(original_entry_id) || original_entry_id < 1) {
+            throw new Error("Geçersiz original_entry_id.");
+        }
+
         if (!has_content) {
             throw new Error("QUOTE için şimdilik content zorunludur.");
         }
+
+        const originalEntryQuery = `
+            SELECT *
+            FROM entries
+            WHERE id = $1
+              AND is_deleted = false
+        `;
+
+        const originalEntryResult = await pool.query(originalEntryQuery, [
+            original_entry_id
+        ]);
+
+        if (originalEntryResult.rows.length === 0) {
+            throw new Error("Alıntılanacak gönderi bulunamadı veya silinmiş.");
+        }
+
+        originalEntry = originalEntryResult.rows[0];
     }
 
     const query = `
-        INSERT INTO entries (user_id, type, content, parent_entry_id, original_entry_id)
+        INSERT INTO entries (
+            user_id,
+            type,
+            content,
+            parent_entry_id,
+            original_entry_id
+        )
         VALUES ($1, $2, $3, $4, $5)
         RETURNING *
     `;
@@ -235,74 +321,63 @@ async function createEntryService({
         original_entry_id ?? null,
     ];
 
-    const result = await pool.query(query, values);
+    const client = await pool.connect();
 
-    const createdEntry = result.rows[0];
+    try {
+        await client.query("BEGIN");
 
-    if (type === "COMMENT") {
-        const parentEntryQuery = `
-            SELECT user_id
-            FROM entries
-            WHERE id = $1
-        `;
+        const result = await client.query(query, values);
 
-        const parentEntryResult = await pool.query(parentEntryQuery, [
-            parent_entry_id
-        ]);
+        const createdEntry = result.rows[0];
 
-        if (parentEntryResult.rows.length > 0) {
+        if (type === "COMMENT" && parentEntry !== null) {
             await createNotificationService({
-                receiver_user_id: Number(parentEntryResult.rows[0].user_id),
+                receiver_user_id: Number(parentEntry.user_id),
                 actor_user_id: Number(user_id),
                 type: "COMMENT",
                 entry_id: Number(createdEntry.id)
-            });
+            }, client);
         }
-    }
 
-    if (type === "QUOTE") {
-        const originalEntryQuery = `
-            SELECT user_id
-            FROM entries
-            WHERE id = $1
-        `;
-
-        const originalEntryResult = await pool.query(originalEntryQuery, [
-            original_entry_id
-        ]);
-
-        if (originalEntryResult.rows.length > 0) {
+        if (type === "QUOTE" && originalEntry !== null) {
             await createNotificationService({
-                receiver_user_id: Number(originalEntryResult.rows[0].user_id),
+                receiver_user_id: Number(originalEntry.user_id),
                 actor_user_id: Number(user_id),
                 type: "QUOTE",
                 entry_id: Number(createdEntry.id)
-            });
+            }, client);
         }
+        
+        const insertedMedia = [];
+
+        for(mediaItem of normalizedMedia) {
+            const mediaInsertQuery = `
+                INSERT INTO entry_media (
+                    entry_id,
+                    media_url,
+                    media_type
+                )
+                VALUES($1, $2, $3) 
+                RETURNING entry_id, media_url, media_type
+            `;
+
+            const mediaInsertResult = await client.query(mediaInsertQuery, [createdEntry.id, mediaItem.media_url, mediaItem.media_type]);
+
+            insertedMedia.push(mediaInsertResult.rows[0]);
+        }
+
+        await client.query("COMMIT");
+
+        return {
+            ...createdEntry,
+            media : insertedMedia
+        }
+    } catch(error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
     }
-
-    const insertedMedia = [];
-
-    for (const mediaItem of normalizedMedia) {
-        const mediaInsertQuery = `
-            INSERT INTO entry_media (entry_id, media_url, media_type)
-            VALUES ($1, $2, $3)
-            RETURNING id, entry_id, media_url, media_type, created_at
-        `;
-
-        const mediaInsertResult = await pool.query(mediaInsertQuery, [
-            createdEntry.id,
-            mediaItem.media_url,
-            mediaItem.media_type
-        ]);
-
-        insertedMedia.push(mediaInsertResult.rows[0]);
-    }
-
-    return {
-        ...createdEntry,
-        media: insertedMedia
-    };
 }
 async function getEntryDetailByEntryIdService(entry_id, current_user_id = null) {
     const selectedEntryQuery = `
@@ -479,6 +554,45 @@ async function hydrateEntryCardByEntryIdService(entry_id, current_user_id = null
         throw new Error("Kullanıcı bulunamadı.");
     }
 
+    if (entry.is_deleted === true) {
+        const commentsQuery = `
+            SELECT COUNT(*) AS count
+            FROM entries
+            WHERE parent_entry_id = $1
+            AND is_deleted = false
+        `;
+
+        const commentsResult = await pool.query(commentsQuery, [entry.id]);
+        const commentsCount = Number(commentsResult.rows[0].count);
+
+        return {
+            id: entry.id,
+            type: entry.type,
+            content: null,
+            parent_entry_id: entry.parent_entry_id,
+            original_entry_id: entry.original_entry_id,
+            is_deleted: entry.is_deleted,
+            created_at: entry.created_at,
+            updated_at: entry.updated_at,
+            author: {
+                id: author.id,
+                full_name: author.full_name,
+                username: author.username,
+                profile_image_url: author.profile_image_url,
+            },
+            media: [],
+            stats: {
+                likes_count: 0,
+                comments_count: commentsCount,
+                reposts_count: 0,
+            },
+            viewer_state: {
+                is_liked_by_me: false,
+                is_reposted_by_me: false,
+            },
+        };
+    }
+
     const likesQuery = `
         SELECT COUNT(*) AS count
         FROM entry_likes
@@ -492,6 +606,7 @@ async function hydrateEntryCardByEntryIdService(entry_id, current_user_id = null
         SELECT COUNT(*) AS count
         FROM entries
         WHERE parent_entry_id = $1
+          AND is_deleted = false
     `;
 
     const commentsResult = await pool.query(commentsQuery, [entry.id]);
@@ -501,7 +616,8 @@ async function hydrateEntryCardByEntryIdService(entry_id, current_user_id = null
         SELECT COUNT(*) AS count
         FROM entries
         WHERE original_entry_id = $1
-        AND type IN ('REPOST', 'QUOTE')
+          AND type IN ('REPOST', 'QUOTE')
+          AND is_deleted = false
     `;
 
     const repostsResult = await pool.query(repostsQuery, [entry.id]);
@@ -522,24 +638,33 @@ async function hydrateEntryCardByEntryIdService(entry_id, current_user_id = null
 
     if (current_user_id !== null && current_user_id !== undefined) {
         const likedByMeQuery = `
-            SELECT *
+            SELECT 1
             FROM entry_likes
             WHERE user_id = $1
-            AND entry_id = $2
+              AND entry_id = $2
         `;
 
-        const likedByMeResult = await pool.query(likedByMeQuery, [current_user_id, entry.id]);
+        const likedByMeResult = await pool.query(likedByMeQuery, [
+            current_user_id,
+            entry.id
+        ]);
+
         is_liked_by_me = likedByMeResult.rows.length > 0;
 
         const repostedByMeQuery = `
-            SELECT *
+            SELECT 1
             FROM entries
             WHERE user_id = $1
-            AND original_entry_id = $2
-            AND type = 'REPOST'
+              AND original_entry_id = $2
+              AND type = 'REPOST'
+              AND is_deleted = false
         `;
 
-        const repostedByMeResult = await pool.query(repostedByMeQuery, [current_user_id, entry.id]);
+        const repostedByMeResult = await pool.query(repostedByMeQuery, [
+            current_user_id,
+            entry.id
+        ]);
+
         is_reposted_by_me = repostedByMeResult.rows.length > 0;
     }
 
@@ -577,8 +702,7 @@ async function getTimelineEntriesService(
     cursor_created_at,
     cursor_id,
     current_user_id,
-    cursor_score = null
-) {
+    cursor_score = null) {
     if (feed_type !== "foryou" && feed_type !== "following") {
         throw new Error("Geçersiz feed_type.");
     }
@@ -637,6 +761,7 @@ async function getTimelineEntriesService(
                                 SELECT COUNT(*)
                                 FROM entries c
                                 WHERE c.parent_entry_id = e.id
+                                  AND c.is_deleted = false
                             ) * 3
                             +
                             (
@@ -644,6 +769,7 @@ async function getTimelineEntriesService(
                                 FROM entries r
                                 WHERE r.original_entry_id = e.id
                                   AND r.type IN ('REPOST', 'QUOTE')
+                                  AND r.is_deleted = false
                             ) * 4
                             +
                             GREATEST(
@@ -652,6 +778,7 @@ async function getTimelineEntriesService(
                             )
                         ) AS score
                     FROM entries e
+                    WHERE e.is_deleted = false
                 )
                 SELECT *
                 FROM ranked_entries
@@ -677,6 +804,7 @@ async function getTimelineEntriesService(
                                 SELECT COUNT(*)
                                 FROM entries c
                                 WHERE c.parent_entry_id = e.id
+                                  AND c.is_deleted = false
                             ) * 3
                             +
                             (
@@ -684,6 +812,7 @@ async function getTimelineEntriesService(
                                 FROM entries r
                                 WHERE r.original_entry_id = e.id
                                   AND r.type IN ('REPOST', 'QUOTE')
+                                  AND r.is_deleted = false
                             ) * 4
                             +
                             GREATEST(
@@ -692,6 +821,7 @@ async function getTimelineEntriesService(
                             )
                         ) AS score
                     FROM entries e
+                    WHERE e.is_deleted = false
                 )
                 SELECT *
                 FROM ranked_entries
@@ -740,6 +870,7 @@ async function getTimelineEntriesService(
                 const fallbackForYouQuery = `
                     SELECT *
                     FROM entries
+                    WHERE is_deleted = false
                     ORDER BY created_at DESC, id DESC
                     LIMIT $1
                 `;
@@ -753,9 +884,11 @@ async function getTimelineEntriesService(
                 const fallbackForYouCursorQuery = `
                     SELECT *
                     FROM entries
-                    WHERE
-                        created_at < $2
-                        OR (created_at = $2 AND id < $3)
+                    WHERE is_deleted = false
+                      AND (
+                          created_at < $2
+                          OR (created_at = $2 AND id < $3)
+                      )
                     ORDER BY created_at DESC, id DESC
                     LIMIT $1
                 `;
@@ -779,8 +912,11 @@ async function getTimelineEntriesService(
                 const followingQuery = `
                     SELECT *
                     FROM entries
-                    WHERE user_id = ANY($1::bigint[])
-                       OR user_id = $2
+                    WHERE is_deleted = false
+                      AND (
+                          user_id = ANY($1::bigint[])
+                          OR user_id = $2
+                      )
                     ORDER BY created_at DESC, id DESC
                     LIMIT $3
                 `;
@@ -798,16 +934,15 @@ async function getTimelineEntriesService(
                 const followingCursorQuery = `
                     SELECT *
                     FROM entries
-                    WHERE
-                        (
-                            user_id = ANY($1::bigint[])
-                            OR user_id = $2
-                        )
-                        AND
-                        (
-                            created_at < $3
-                            OR (created_at = $3 AND id < $4)
-                        )
+                    WHERE is_deleted = false
+                      AND (
+                          user_id = ANY($1::bigint[])
+                          OR user_id = $2
+                      )
+                      AND (
+                          created_at < $3
+                          OR (created_at = $3 AND id < $4)
+                      )
                     ORDER BY created_at DESC, id DESC
                     LIMIT $5
                 `;
@@ -954,6 +1089,7 @@ async function toggleEntryLikeService(user_id, entry_id) {
         SELECT *
         FROM entries
         WHERE id = $1
+          AND is_deleted = false
     `;
 
     const entryResult = await pool.query(entryQuery, [entry_id]);
@@ -1008,37 +1144,61 @@ async function toggleEntryLikeService(user_id, entry_id) {
 }
 
 async function toggleEntryRepostService(user_id, original_entry_id) {
+    user_id = Number(user_id);
+    original_entry_id = Number(original_entry_id);
+
+    if (!Number.isInteger(user_id) || user_id < 1) {
+        throw new Error("Geçersiz user_id.");
+    }
+
+    if (!Number.isInteger(original_entry_id) || original_entry_id < 1) {
+        throw new Error("Geçersiz original_entry_id.");
+    }
+
     const originalEntryQuery = `
         SELECT *
         FROM entries
         WHERE id = $1
+          AND is_deleted = false
     `;
 
-    const originalEntryResult = await pool.query(originalEntryQuery, [original_entry_id]);
+    const originalEntryResult = await pool.query(originalEntryQuery, [
+        original_entry_id
+    ]);
 
     if (originalEntryResult.rows.length === 0) {
-        throw new Error("Gönderi bulunamadı.");
+        throw new Error("Repost yapılacak gönderi bulunamadı veya silinmiş.");
     }
+
+    const originalEntry = originalEntryResult.rows[0];
 
     const repostQuery = `
         SELECT *
         FROM entries
         WHERE type = 'REPOST'
-        AND user_id = $1
-        AND original_entry_id = $2
+          AND user_id = $1
+          AND original_entry_id = $2
+          AND is_deleted = false
     `;
 
-    const repostResult = await pool.query(repostQuery, [user_id, original_entry_id]);
+    const repostResult = await pool.query(repostQuery, [
+        user_id,
+        original_entry_id
+    ]);
 
     if (repostResult.rows.length > 0) {
         const deleteRepostQuery = `
             DELETE FROM entries
             WHERE type = 'REPOST'
-            AND user_id = $1
-            AND original_entry_id = $2
+              AND user_id = $1
+              AND original_entry_id = $2
+              AND is_deleted = false
         `;
 
-        await pool.query(deleteRepostQuery, [user_id, original_entry_id]);
+        await pool.query(deleteRepostQuery, [
+            user_id,
+            original_entry_id
+        ]);
 
         return {
             original_entry_id,
@@ -1046,24 +1206,30 @@ async function toggleEntryRepostService(user_id, original_entry_id) {
         };
     }
 
-    const repostEntryQuery = `
-        INSERT INTO entries (user_id, type, content, parent_entry_id, original_entry_id)
-        VALUES ($1, $2, $3, $4, $5)
-    `;
-
-    const repostInsertResult = await pool.query(
-    `
-        INSERT INTO entries (user_id, type, content, parent_entry_id, original_entry_id)
+    const repostInsertQuery = `
+        INSERT INTO entries (
+            user_id,
+            type,
+            content,
+            parent_entry_id,
+            original_entry_id
+        )
         VALUES ($1, $2, $3, $4, $5)
         RETURNING *
-    `,
-        [user_id, "REPOST", null, null, original_entry_id]
-    );
+    `;
+
+    const repostInsertResult = await pool.query(repostInsertQuery, [
+        user_id,
+        "REPOST",
+        null,
+        null,
+        original_entry_id
+    ]);
 
     const repostEntry = repostInsertResult.rows[0];
 
     await createNotificationService({
-        receiver_user_id: Number(originalEntryResult.rows[0].user_id),
+        receiver_user_id: Number(originalEntry.user_id),
         actor_user_id: Number(user_id),
         type: "REPOST",
         entry_id: Number(repostEntry.id)
@@ -1074,7 +1240,6 @@ async function toggleEntryRepostService(user_id, original_entry_id) {
         is_reposted_by_me: true,
     };
 }
-
 async function getEntryLikesService(entry_id, current_user_id, limit = 10, offset = 0) {
     if (!Number.isInteger(entry_id) || entry_id < 1) {
         throw new Error("Geçersiz entry_id.");
@@ -1181,6 +1346,80 @@ async function getEntryLikesService(entry_id, current_user_id, limit = 10, offse
     };
 }
 
+async function deleteEntryService(user_id, entry_id) {
+    user_id = Number(user_id);
+    entry_id = Number(entry_id);
+
+    if (!Number.isInteger(user_id) || user_id < 1) {
+        throw new Error("Geçersiz user_id.");
+    }
+
+    if (!Number.isInteger(entry_id) || entry_id < 1) {
+        throw new Error("Geçersiz entry_id.");
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const entryQuery = `
+            SELECT *
+            FROM entries
+            WHERE id = $1
+        `;
+
+        const entryResult = await client.query(entryQuery, [entry_id]);
+
+        if (entryResult.rows.length === 0) {
+            throw new Error("Gönderi bulunamadı.");
+        }
+
+        const entry = entryResult.rows[0];
+
+        if (entry.is_deleted === true) {
+            throw new Error("Gönderi zaten silinmiş.");
+        }
+
+        if (Number(entry.user_id) !== user_id) {
+            throw new Error("Bu gönderiyi silme yetkiniz yok.");
+        }
+
+        const updateEntryQuery = `
+            UPDATE entries
+            SET
+                is_deleted = TRUE,
+                content = NULL,
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING id, is_deleted, updated_at
+        `;
+
+        const updateEntryResult = await client.query(updateEntryQuery, [entry_id]);
+
+        const deleteMediaQuery = `
+            DELETE FROM entry_media
+            WHERE entry_id = $1
+        `;
+
+        await client.query(deleteMediaQuery, [entry_id]);
+
+        await client.query("COMMIT");
+
+        return {
+            entry_id: updateEntryResult.rows[0].id,
+            is_deleted: updateEntryResult.rows[0].is_deleted,
+            updated_at: updateEntryResult.rows[0].updated_at
+        };
+
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+
+    } finally {
+        client.release();
+    }
+}
 
 module.exports = {
     createEntryService,
@@ -1190,5 +1429,6 @@ module.exports = {
     hydrateTimelineEntryCardByEntryIdService,
     toggleEntryLikeService,
     toggleEntryRepostService,
-    getEntryLikesService
+    getEntryLikesService,
+    deleteEntryService
 };

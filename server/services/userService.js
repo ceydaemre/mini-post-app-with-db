@@ -194,6 +194,7 @@ async function getUserPostsService(profile_user_id, current_user_id = null, limi
         FROM entries
         WHERE user_id = $1
           AND type IN ('POST', 'REPOST', 'QUOTE')
+          AND is_deleted = false
         ORDER BY created_at DESC
         LIMIT $2
         OFFSET $3
@@ -269,6 +270,7 @@ async function getUserRepliesService(profile_user_id, current_user_id = null, li
         FROM entries
         WHERE user_id = $1
           AND type = 'COMMENT'
+          AND is_deleted = false
         ORDER BY created_at DESC
         LIMIT $2
         OFFSET $3
@@ -337,10 +339,13 @@ async function getUserLikesService(profile_user_id, current_user_id, limit = 10,
     }
 
     const userLikesQuery = `
-        SELECT *
-        FROM entry_likes
-        WHERE user_id = $1
-        ORDER BY id DESC
+        SELECT el.*
+        FROM entry_likes el
+        INNER JOIN entries e
+            ON el.entry_id = e.id
+        WHERE el.user_id = $1
+          AND e.is_deleted = false
+        ORDER BY el.id DESC
         LIMIT $2
         OFFSET $3
     `;
@@ -378,75 +383,6 @@ async function getUserLikesService(profile_user_id, current_user_id, limit = 10,
     };
 }
 
-async function getUserLikesService(profile_user_id, current_user_id, limit = 10, offset = 0) {
-    if (!Number.isInteger(profile_user_id) || profile_user_id < 1) {
-        throw new Error("Geçersiz profile_user_id.");
-    }
-
-    if (!Number.isInteger(current_user_id) || current_user_id < 1) {
-        throw new Error("Geçersiz current_user_id.");
-    }
-
-    if (!Number.isInteger(limit) || limit < 1) {
-        throw new Error("Geçersiz limit.");
-    }
-
-    if (!Number.isInteger(offset) || offset < 0) {
-        throw new Error("Geçersiz offset.");
-    }
-
-    const profileUserQuery = `
-        SELECT 1
-        FROM users
-        WHERE id = $1
-    `;
-
-    const profileUserResult = await pool.query(profileUserQuery, [profile_user_id]);
-
-    if (profileUserResult.rows.length === 0) {
-        throw new Error("Kullanıcı bulunamadı.");
-    }
-
-    const userLikesQuery = `
-        SELECT entry_id
-        FROM entry_likes
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT $2
-        OFFSET $3
-    `;
-
-    const rawLikesResult = await pool.query(userLikesQuery, [
-        profile_user_id,
-        limit + 1,
-        offset
-    ]);
-
-    const rawLikes = rawLikesResult.rows;
-
-    const selectedLikes = rawLikes.slice(0, limit);
-
-    const hydratedLikes = await Promise.all(
-        selectedLikes.map(async (like) => {
-            return await hydrateTimelineEntryCardByEntryIdService(
-                like.entry_id,
-                current_user_id
-            );
-        })
-    );
-
-    const pagination = buildPaginationMeta(
-        limit,
-        offset,
-        rawLikes.length,
-        hydratedLikes.length
-    );
-
-    return {
-        items: hydratedLikes,
-        pagination
-    };
-}
 
 module.exports = {
     toggleFollowService,

@@ -10,7 +10,8 @@ const {
     getTimelineEntries,
     toggleEntryLike,
     toggleEntryRepost,
-    getEntryLikes
+    getEntryLikes,
+    deleteEntry
 } = require("../controllers/entryController");
 
 const {
@@ -29,5 +30,7 @@ router.get("/:id/likes", authMiddleware, getEntryLikes);
 
 router.patch("/:id/like", authMiddleware, toggleEntryLike);
 router.patch("/:id/repost", authMiddleware, toggleEntryRepost);
+
+router.delete("/:id", authMiddleware, deleteEntry);
 
 module.exports = router;
