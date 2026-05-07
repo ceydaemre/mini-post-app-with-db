@@ -494,7 +494,7 @@ async function getEntryDetailByEntryIdService(entry_id, current_user_id = null) 
         };
     }
 
-    if (selectedEntry.type === "QUOTE") {
+   if (selectedEntry.type === "QUOTE") {
         const hydratedEntry = await hydrateEntryCardByEntryIdService(
             selectedEntry.id,
             current_user_id
@@ -502,7 +502,7 @@ async function getEntryDetailByEntryIdService(entry_id, current_user_id = null) 
 
         const originalEntry = await getOriginalEntry(selectedEntry);
 
-        const embedded_original_entry = await hydrateEntryCardByEntryIdService(
+        const embedded_original_entry = await hydrateEmbeddedOriginalEntryService(
             originalEntry.id,
             current_user_id
         );
@@ -523,7 +523,6 @@ async function getEntryDetailByEntryIdService(entry_id, current_user_id = null) 
             embedded_original_entry
         };
     }
-
     throw new Error("Desteklenmeyen entry type.");
 }
 
@@ -695,7 +694,9 @@ async function hydrateEntryCardByEntryIdService(entry_id, current_user_id = null
         },
     };
 }
-
+async function hydrateEmbeddedOriginalEntryService(entry_id, current_user_id = null) {
+    return await hydrateEntryCardByEntryIdService(entry_id, current_user_id);
+}
 async function getTimelineEntriesService(
     feed_type,
     limit,
@@ -1059,8 +1060,16 @@ async function hydrateTimelineEntryCardByEntryIdService(entry_id, current_user_i
 
     if (selectedEntry.type === "QUOTE") {
         const originalEntry = await getOriginalEntry(selectedEntry);
-        const hydratedOriginalEntry = await hydrateEntryCardByEntryIdService(originalEntry.id, current_user_id);
-        const hydratedQuote = await hydrateEntryCardByEntryIdService(selectedEntry.id, current_user_id);
+
+        const hydratedOriginalEntry = await hydrateEmbeddedOriginalEntryService(
+            originalEntry.id,
+            current_user_id
+        );
+
+        const hydratedQuote = await hydrateEntryCardByEntryIdService(
+            selectedEntry.id,
+            current_user_id
+        );
 
         return {
             entry_type: selectedEntry.type,
