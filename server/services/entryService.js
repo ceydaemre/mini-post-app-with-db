@@ -175,6 +175,12 @@ async function createEntryService({
         content !== undefined &&
         String(content).trim() !== "";
 
+    const has_media = normalizedMedia.length > 0;
+
+    const normalizedContent = has_content
+        ? String(content).trim()
+        : null;
+
     let parentEntry = null;
     let originalEntry = null;
 
@@ -187,8 +193,8 @@ async function createEntryService({
             throw new Error("POST için original_entry_id null olmalıdır.");
         }
 
-        if (!has_content) {
-            throw new Error("POST için şimdilik content zorunludur.");
+        if (!has_content && !has_media) {
+            throw new Error("POST için content veya media zorunludur.");
         }
     }
 
@@ -206,7 +212,7 @@ async function createEntryService({
         }
 
         if (!has_content) {
-            throw new Error("COMMENT için şimdilik content zorunludur.");
+            throw new Error("COMMENT için content zorunludur.");
         }
 
         const parentEntryQuery = `
@@ -244,7 +250,7 @@ async function createEntryService({
             throw new Error("REPOST için content boş olmalıdır.");
         }
 
-        if (normalizedMedia.length > 0) {
+        if (has_media) {
             throw new Error("REPOST için media boş olmalıdır.");
         }
 
@@ -280,7 +286,7 @@ async function createEntryService({
         }
 
         if (!has_content) {
-            throw new Error("QUOTE için şimdilik content zorunludur.");
+            throw new Error("QUOTE için content zorunludur.");
         }
 
         const originalEntryQuery = `
@@ -316,9 +322,9 @@ async function createEntryService({
     const values = [
         user_id,
         type,
-        content ?? null,
+        normalizedContent,
         parent_entry_id ?? null,
-        original_entry_id ?? null,
+        original_entry_id ?? null
     ];
 
     const client = await pool.connect();
@@ -347,21 +353,25 @@ async function createEntryService({
                 entry_id: Number(createdEntry.id)
             }, client);
         }
-        
+
         const insertedMedia = [];
 
-        for(mediaItem of normalizedMedia) {
+        for (const mediaItem of normalizedMedia) {
             const mediaInsertQuery = `
                 INSERT INTO entry_media (
                     entry_id,
                     media_url,
                     media_type
                 )
-                VALUES($1, $2, $3) 
-                RETURNING entry_id, media_url, media_type
+                VALUES ($1, $2, $3)
+                RETURNING id, entry_id, media_url, media_type, created_at
             `;
 
-            const mediaInsertResult = await client.query(mediaInsertQuery, [createdEntry.id, mediaItem.media_url, mediaItem.media_type]);
+            const mediaInsertResult = await client.query(mediaInsertQuery, [
+                createdEntry.id,
+                mediaItem.media_url,
+                mediaItem.media_type
+            ]);
 
             insertedMedia.push(mediaInsertResult.rows[0]);
         }
@@ -370,11 +380,13 @@ async function createEntryService({
 
         return {
             ...createdEntry,
-            media : insertedMedia
-        }
-    } catch(error) {
+            media: insertedMedia
+        };
+
+    } catch (error) {
         await client.query("ROLLBACK");
         throw error;
+
     } finally {
         client.release();
     }

@@ -3,7 +3,11 @@ const {
     getUserProfileService,
     getUserPostsService,
     getUserRepliesService,
-    getUserLikesService
+    getUserLikesService,
+    updateMyProfileService,
+    getUserFollowersService,
+    getUserFollowingService,
+    getUserMediaService
 } = require("../services/userService");
 
 async function toggleFollow(req, res) {
@@ -209,10 +213,237 @@ async function getUserLikes(req, res) {
     }
 }
 
+async function updateMyProfile(req, res) {
+    try {
+        const user_id = Number(req.user.id);
+        const { full_name, bio, profile_image_url, banner_image_url } = req.body;
+
+        const result = await updateMyProfileService({user_id, full_name, bio, profile_image_url, banner_image_url});
+
+        return res.status(200).json({
+            message : "Profil güncellendi.",
+            data : result
+        });
+    } catch(error) {
+        console.error("updateMyProfile controller hatası : ", error.message);
+
+        return res.status(400).json({
+            message : error.message,
+        });
+    }
+}
+
+async function getUserFollowers(req, res) {
+    try {
+        const profile_user_id = Number(req.params.id);
+
+        const current_user_id =
+            req.user && req.user.id !== undefined
+                ? Number(req.user.id)
+                : null;
+
+        let limit = Number(req.query.limit);
+        let offset = Number(req.query.offset);
+
+        if (Number.isNaN(limit)) {
+            limit = 10;
+        }
+
+        if (Number.isNaN(offset)) {
+            offset = 0;
+        }
+
+        if (!Number.isInteger(profile_user_id) || profile_user_id < 1) {
+            return res.status(400).json({
+                message: "Geçersiz profile_user_id."
+            });
+        }
+
+        if (
+            current_user_id !== null &&
+            (!Number.isInteger(current_user_id) || current_user_id < 1)
+        ) {
+            return res.status(400).json({
+                message: "Geçersiz current_user_id."
+            });
+        }
+
+        if (!Number.isInteger(limit) || limit < 1) {
+            return res.status(400).json({
+                message: "Geçersiz limit."
+            });
+        }
+
+        if (!Number.isInteger(offset) || offset < 0) {
+            return res.status(400).json({
+                message: "Geçersiz offset."
+            });
+        }
+
+        const result = await getUserFollowersService(
+            profile_user_id,
+            current_user_id,
+            limit,
+            offset
+        );
+
+        return res.status(200).json({
+            message: "Kullanıcının takipçileri getirildi.",
+            data: result
+        });
+
+    } catch (error) {
+        console.error("getUserFollowers controller hatası:", error.message);
+
+        return res.status(400).json({
+            message: error.message
+        });
+    }
+}
+async function getUserFollowing(req, res) {
+    try {
+        const profile_user_id = Number(req.params.id);
+
+        const current_user_id =
+            req.user && req.user.id !== undefined
+                ? Number(req.user.id)
+                : null;
+
+        let limit = Number(req.query.limit);
+        let offset = Number(req.query.offset);
+
+        if (Number.isNaN(limit)) {
+            limit = 10;
+        }
+
+        if (Number.isNaN(offset)) {
+            offset = 0;
+        }
+
+        if (!Number.isInteger(profile_user_id) || profile_user_id < 1) {
+            return res.status(400).json({
+                message: "Geçersiz profile_user_id."
+            });
+        }
+
+        if (
+            current_user_id !== null &&
+            (!Number.isInteger(current_user_id) || current_user_id < 1)
+        ) {
+            return res.status(400).json({
+                message: "Geçersiz current_user_id."
+            });
+        }
+
+        if (!Number.isInteger(limit) || limit < 1) {
+            return res.status(400).json({
+                message: "Geçersiz limit."
+            });
+        }
+
+        if (!Number.isInteger(offset) || offset < 0) {
+            return res.status(400).json({
+                message: "Geçersiz offset."
+            });
+        }
+
+        const result = await getUserFollowingService(
+            profile_user_id,
+            current_user_id,
+            limit,
+            offset
+        );
+
+        return res.status(200).json({
+            message: "Kullanıcının takip ettikleri getirildi.",
+            data: result
+        });
+
+    } catch (error) {
+        console.error("getUserFollowing controller hatası:", error.message);
+
+        return res.status(400).json({
+            message: error.message
+        });
+    }
+}
+async function getUserMedia(req, res) {
+    try {
+        const profile_user_id = Number(req.params.id);
+
+        const current_user_id =
+            req.user && req.user.id !== undefined
+                ? Number(req.user.id)
+                : null;
+
+        let limit = Number(req.query.limit);
+        let offset = Number(req.query.offset);
+
+        if (Number.isNaN(limit)) {
+            limit = 10;
+        }
+
+        if (Number.isNaN(offset)) {
+            offset = 0;
+        }
+
+        if (!Number.isInteger(profile_user_id) || profile_user_id < 1) {
+            return res.status(400).json({
+                message: "Geçersiz profile_user_id."
+            });
+        }
+
+        if (
+            current_user_id !== null &&
+            (!Number.isInteger(current_user_id) || current_user_id < 1)
+        ) {
+            return res.status(400).json({
+                message: "Geçersiz current_user_id."
+            });
+        }
+
+        if (!Number.isInteger(limit) || limit < 1) {
+            return res.status(400).json({
+                message: "Geçersiz limit."
+            });
+        }
+
+        if (!Number.isInteger(offset) || offset < 0) {
+            return res.status(400).json({
+                message: "Geçersiz offset."
+            });
+        }
+
+        const result = await getUserMediaService(
+            profile_user_id,
+            current_user_id,
+            limit,
+            offset
+        );
+
+        return res.status(200).json({
+            message: "Kullanıcının medya içerikleri getirildi.",
+            data: result
+        });
+
+    } catch (error) {
+        console.error("getUserMedia controller hatası:", error.message);
+
+        return res.status(400).json({
+            message: error.message
+        });
+    }
+}
+
+
 module.exports = {
     toggleFollow,
     getUserProfile,
     getUserPosts,
     getUserReplies,
-    getUserLikes
+    getUserLikes,
+    updateMyProfile,
+    getUserFollowers,
+    getUserFollowing,
+    getUserMedia
 };

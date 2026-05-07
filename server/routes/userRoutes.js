@@ -6,7 +6,11 @@ const {
     getUserProfile,
     getUserPosts,
     getUserReplies,
-    getUserLikes
+    getUserLikes,
+    updateMyProfile,
+    getUserFollowers,
+    getUserFollowing,
+    getUserMedia
 } = require("../controllers/userController");
 
 const {
@@ -14,12 +18,17 @@ const {
     optionalAuthMiddleware,
 } = require("../middlewares/authMiddleware");
 
+router.patch("/me/profile", authMiddleware, updateMyProfile);
+
 router.post("/:id/follow", authMiddleware, toggleFollow);
-router.get("/:id/likes", authMiddleware, getUserLikes);
+
+router.get("/:id/followers", optionalAuthMiddleware, getUserFollowers);
+router.get("/:id/following", optionalAuthMiddleware, getUserFollowing);
+router.get("/:id/media", optionalAuthMiddleware, getUserMedia);
+
 router.get("/:id/profile", optionalAuthMiddleware, getUserProfile);
 router.get("/:id/posts", optionalAuthMiddleware, getUserPosts);
 router.get("/:id/replies", optionalAuthMiddleware, getUserReplies);
 router.get("/:id/likes", authMiddleware, getUserLikes);
-
 
 module.exports = router;
