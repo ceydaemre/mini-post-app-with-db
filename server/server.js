@@ -7,6 +7,8 @@ const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const searchRoutes = require("./routes/searchRoutes");
 const notificationsRoutes = require("./routes/notificationsRoutes");
+const messageRoutes = require("./routes/messageRoutes");
+
 const app = express();
 
 app.use(express.json());
@@ -33,6 +35,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes); 
 app.use("/api/search", searchRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/messages", messageRoutes);
 
 const PORT = process.env.PORT || 3001;
 
