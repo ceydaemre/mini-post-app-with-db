@@ -211,8 +211,8 @@ async function createEntryService({
             throw new Error("COMMENT için original_entry_id null olmalıdır.");
         }
 
-        if (!has_content && !has_media) {
-            throw new Error("COMMENT için content veya media zorunludur.");
+        if (!has_content) {
+            throw new Error("COMMENT için content zorunludur.");
         }
 
         const parentEntryQuery = `
@@ -285,8 +285,8 @@ async function createEntryService({
             throw new Error("Geçersiz original_entry_id.");
         }
 
-        if (!has_content && !has_media) {
-            throw new Error("QUOTE için content veya media zorunludur.");
+        if (!has_content) {
+            throw new Error("QUOTE için content zorunludur.");
         }
 
         const originalEntryQuery = `

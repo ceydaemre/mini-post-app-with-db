@@ -11,6 +11,7 @@ const {
     toggleEntryLike,
     toggleEntryRepost,
     getEntryLikes,
+    updateEntry,
     deleteEntry
 } = require("../controllers/entryController");
 
@@ -30,6 +31,7 @@ router.get("/:id/likes", authMiddleware, getEntryLikes);
 
 router.patch("/:id/like", authMiddleware, toggleEntryLike);
 router.patch("/:id/repost", authMiddleware, toggleEntryRepost);
+router.patch("/:id", authMiddleware, updateEntry);
 
 router.delete("/:id", authMiddleware, deleteEntry);
 
