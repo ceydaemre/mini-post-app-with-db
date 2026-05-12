@@ -1558,17 +1558,6 @@ textarea {
   display: none !important;
 }
 
-.entry-footer,
-.entry-card-footer,
-.entry-actions-wrapper,
-.entry-meta-actions,
-.entry-bottom-row {
-  border: none !important;
-  margin-top: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  background: transparent !important;
-}
 
 .entry-icon-button,
 .detail-selected-entry-card .entry-icon-button,
