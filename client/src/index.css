@@ -1793,20 +1793,6 @@ textarea {
   margin: 0;
 }
 
-.compose-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.compose-actions .file-upload-button {
-  align-self: center;
-}
-
-.compose-actions button {
-  align-self: center;
-}
 
 
 .entry-media-item {
