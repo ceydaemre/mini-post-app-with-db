@@ -435,7 +435,11 @@ function MediaViewerComment({
             )}
           </div>
 
-          <p>{localComment.is_deleted ? "Bu gönderi silinmiş." : localComment.content}</p>
+          {(localComment.is_deleted || localComment.content) && (
+            <p>
+              {localComment.is_deleted ? "Bu gönderi silinmiş." : localComment.content}
+            </p>
+          )}
 
           <MediaPreview
             media={localComment.media}
