@@ -772,9 +772,9 @@ function MediaViewerModal({
               )}
             </div>
 
-            {shownEntry.content && (
-              <p className="media-viewer-entry-content">{shownEntry.content}</p>
-            )}
+            <p className="media-viewer-entry-content">
+              {shownEntry.is_deleted ? "Bu gönderi silinmiş." : shownEntry.content}
+            </p>
 
             {dateText && <p className="media-viewer-date">{dateText}</p>}
 
