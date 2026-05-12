@@ -122,7 +122,7 @@ function MediaPreview({ media }) {
   );
 }
 
-function MediaViewerMainActions({ entry }) {
+function MediaViewerMainActions({ entry, onOpenDetail }) {
   const [liked, setLiked] = useState(Boolean(entry?.viewer_state?.is_liked_by_me));
   const [reposted, setReposted] = useState(Boolean(entry?.viewer_state?.is_reposted_by_me));
   const [likesCount, setLikesCount] = useState(entry?.stats?.likes_count || 0);
@@ -190,10 +190,14 @@ function MediaViewerMainActions({ entry }) {
   return (
     <>
       <div className="media-viewer-actions">
-        <span>
+        <button
+          type="button"
+          className="media-viewer-main-action comment-button"
+          onClick={() => onOpenDetail(entry.id)}
+        >
           <MessageCircle size={17} />
-          {entry?.stats?.comments_count || 0}
-        </span>
+          <span>{entry?.stats?.comments_count || 0}</span>
+        </button>
 
         <div className="repost-action-wrapper media-viewer-repost-wrapper">
           <button
@@ -774,7 +778,10 @@ function MediaViewerModal({
 
             {dateText && <p className="media-viewer-date">{dateText}</p>}
 
-            <MediaViewerMainActions entry={shownEntry} />
+            <MediaViewerMainActions
+              entry={shownEntry}
+              onOpenDetail={handleOpenCommentDetail}
+            />
           </div>
 
           <form className="media-viewer-reply-box" onSubmit={handleCreateComment}>
