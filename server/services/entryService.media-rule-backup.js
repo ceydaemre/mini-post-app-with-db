@@ -95,7 +95,6 @@ async function getChildrenByEntryIdService(entry_id, current_user_id = null) {
         SELECT *
         FROM entries
         WHERE parent_entry_id = $1
-          AND is_deleted = false
         ORDER BY created_at ASC
     `;
 
@@ -212,8 +211,8 @@ async function createEntryService({
             throw new Error("COMMENT için original_entry_id null olmalıdır.");
         }
 
-        if (!has_content && !has_media) {
-            throw new Error("COMMENT için content veya media zorunludur.");
+        if (!has_content) {
+            throw new Error("COMMENT için content zorunludur.");
         }
 
         const parentEntryQuery = `
@@ -286,8 +285,8 @@ async function createEntryService({
             throw new Error("Geçersiz original_entry_id.");
         }
 
-        if (!has_content && !has_media) {
-            throw new Error("QUOTE için content veya media zorunludur.");
+        if (!has_content) {
+            throw new Error("QUOTE için content zorunludur.");
         }
 
         const originalEntryQuery = `
@@ -1369,7 +1368,7 @@ async function getEntryLikesService(entry_id, current_user_id, limit = 10, offse
 }
 
 
-async function updateEntryService(user_id, entry_id, { content }) {
+async function updateEntryService(user_id, entry_id, { content, media }) {
     user_id = Number(user_id);
     entry_id = Number(entry_id);
 
@@ -1386,8 +1385,12 @@ async function updateEntryService(user_id, entry_id, { content }) {
             ? ""
             : String(content).trim();
 
-    if (!normalizedContent) {
-        throw new Error("Entry content boş olamaz.");
+    const normalizedMedia = Array.isArray(media)
+        ? media.filter((item) => item && item.media_url && item.media_type)
+        : [];
+
+    if (!normalizedContent && normalizedMedia.length === 0) {
+        throw new Error("Entry için yazı veya medya bulunmalıdır.");
     }
 
     const client = await pool.connect();
@@ -1434,6 +1437,32 @@ async function updateEntryService(user_id, entry_id, { content }) {
             normalizedContent || null,
             entry_id
         ]);
+
+        const deleteMediaQuery = `
+            DELETE FROM entry_media
+            WHERE entry_id = $1
+        `;
+
+        await client.query(deleteMediaQuery, [entry_id]);
+
+        if (normalizedMedia.length > 0) {
+            for (const item of normalizedMedia) {
+                const insertMediaQuery = `
+                    INSERT INTO entry_media (
+                        entry_id,
+                        media_url,
+                        media_type
+                    )
+                    VALUES ($1, $2, $3)
+                `;
+
+                await client.query(insertMediaQuery, [
+                    entry_id,
+                    item.media_url,
+                    item.media_type
+                ]);
+            }
+        }
 
         await client.query("COMMIT");
 

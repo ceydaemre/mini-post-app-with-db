@@ -5,6 +5,7 @@ const {
     toggleEntryLikeService,
     toggleEntryRepostService,
     getEntryLikesService,
+    updateEntryService,
     deleteEntryService
 } = require("../services/entryService");
 
@@ -412,6 +413,42 @@ async function getEntryLikes(req, res) {
     }
 }
 
+
+async function updateEntry(req, res) {
+    try {
+        const user_id = Number(req.user.id);
+        const entry_id = Number(req.params.id);
+
+        if (!Number.isInteger(user_id) || user_id < 1) {
+            return res.status(400).json({
+                message: "Geçersiz user_id."
+            });
+        }
+
+        if (!Number.isInteger(entry_id) || entry_id < 1) {
+            return res.status(400).json({
+                message: "Geçersiz entry_id."
+            });
+        }
+
+        const result = await updateEntryService(user_id, entry_id, {
+            content: req.body.content,
+            media: req.body.media
+        });
+
+        return res.status(200).json({
+            message: "Entry güncellendi.",
+            data: result
+        });
+    } catch (error) {
+        console.error("updateEntry controller hatası:", error.message);
+
+        return res.status(400).json({
+            message: error.message
+        });
+    }
+}
+
 async function deleteEntry(req, res) {
     try {
         const user_id = Number(req.user.id);
@@ -454,5 +491,6 @@ module.exports = {
     toggleEntryLike,
     toggleEntryRepost,
     getEntryLikes,
+    updateEntry,
     deleteEntry
 };
