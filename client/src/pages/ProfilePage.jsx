@@ -13,6 +13,7 @@ import {
 } from "../api/userApi.js";
 
 const VALID_TABS = ["posts", "replies", "likes", "media"];
+const PROFILE_ITEMS_LIMIT = 10;
 
 function normalizeEntryItem(rawItem) {
   if (rawItem.entry) {
@@ -56,6 +57,8 @@ function ProfilePage() {
   const [profileData, setProfileData] = useState(null);
   const [activeTab, setActiveTab] = useState(getTabFromSearchParams(searchParams));
   const [items, setItems] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState(0);
 
   const [profileLoading, setProfileLoading] = useState(false);
   const [itemsLoading, setItemsLoading] = useState(false);
@@ -83,27 +86,34 @@ function ProfilePage() {
     }
   }
 
-  async function fetchTabItems(selectedTab) {
+  async function fetchTabItems(
+    selectedTab,
+    { offset = 0, append = false } = {}
+  ) {
     setItemsLoading(true);
     setError("");
 
     try {
       let result;
+      const pagination = {
+        limit: PROFILE_ITEMS_LIMIT,
+        offset,
+      };
 
       if (selectedTab === "posts") {
-        result = await getUserPosts(id);
+        result = await getUserPosts(id, pagination);
       }
 
       if (selectedTab === "replies") {
-        result = await getUserReplies(id);
+        result = await getUserReplies(id, pagination);
       }
 
       if (selectedTab === "likes") {
-        result = await getUserLikes(id);
+        result = await getUserLikes(id, pagination);
       }
 
       if (selectedTab === "media") {
-        result = await getUserMedia(id);
+        result = await getUserMedia(id, pagination);
       }
 
       const rawItems =
@@ -115,9 +125,23 @@ function ProfilePage() {
         result?.data ||
         [];
 
-      setItems(Array.isArray(rawItems) ? rawItems.map(normalizeEntryItem) : []);
+      const normalizedItems = Array.isArray(rawItems)
+        ? rawItems.map(normalizeEntryItem)
+        : [];
+
+      setItems((currentItems) =>
+        append ? [...currentItems, ...normalizedItems] : normalizedItems
+      );
+
+      setHasMore(Boolean(result?.data?.pagination?.has_more));
+      setNextOffset(result?.data?.pagination?.next_offset || 0);
     } catch (error) {
-      setItems([]);
+      if (!append) {
+        setItems([]);
+      }
+
+      setHasMore(false);
+      setNextOffset(0);
       setError(error.message);
     } finally {
       setItemsLoading(false);
@@ -126,8 +150,20 @@ function ProfilePage() {
 
   function handleTabChange(tab) {
     setActiveTab(tab);
+    setItems([]);
+    setHasMore(false);
+    setNextOffset(0);
     navigate(`/users/${id}?tab=${tab}`, { replace: false });
     fetchTabItems(tab);
+  }
+
+  function handleLoadMore() {
+    if (itemsLoading || !hasMore) return;
+
+    fetchTabItems(activeTab, {
+      offset: nextOffset,
+      append: true,
+    });
   }
 
   function handleEntryDeleted(entryId) {
@@ -280,7 +316,7 @@ function ProfilePage() {
             </button>
           </section>
 
-          {itemsLoading && (
+          {itemsLoading && items.length === 0 && (
             <section className="empty-state">
               <h3>İçerikler yükleniyor...</h3>
             </section>
@@ -292,7 +328,7 @@ function ProfilePage() {
             </section>
           )}
 
-          {!itemsLoading && items.length > 0 && (
+          {items.length > 0 && (
             <section className="timeline-list profile-entry-list">
               {items.map((item) => (
                 <EntryCard
@@ -303,6 +339,16 @@ function ProfilePage() {
                 />
               ))}
             </section>
+          )}
+
+          {hasMore && (
+            <button
+              className="load-more-button"
+              onClick={handleLoadMore}
+              disabled={itemsLoading}
+            >
+              {itemsLoading ? "Yükleniyor..." : "Daha fazla yükle"}
+            </button>
           )}
 
           {editModalOpen && (

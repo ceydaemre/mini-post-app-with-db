@@ -21,18 +21,27 @@ export function updateMyProfile({
   });
 }
 
-export function getUserPosts(userId) {
-  return apiRequest(`/api/users/${userId}/posts`);
+function buildPaginationQuery({ limit = 10, offset = 0 } = {}) {
+  const params = new URLSearchParams();
+
+  params.set("limit", String(limit));
+  params.set("offset", String(offset));
+
+  return params.toString();
 }
 
-export function getUserReplies(userId) {
-  return apiRequest(`/api/users/${userId}/replies`);
+export function getUserPosts(userId, pagination = {}) {
+  return apiRequest(`/api/users/${userId}/posts?${buildPaginationQuery(pagination)}`);
 }
 
-export function getUserLikes(userId) {
-  return apiRequest(`/api/users/${userId}/likes`);
+export function getUserReplies(userId, pagination = {}) {
+  return apiRequest(`/api/users/${userId}/replies?${buildPaginationQuery(pagination)}`);
 }
 
-export function getUserMedia(userId) {
-  return apiRequest(`/api/users/${userId}/media`);
+export function getUserLikes(userId, pagination = {}) {
+  return apiRequest(`/api/users/${userId}/likes?${buildPaginationQuery(pagination)}`);
+}
+
+export function getUserMedia(userId, pagination = {}) {
+  return apiRequest(`/api/users/${userId}/media?${buildPaginationQuery(pagination)}`);
 }
