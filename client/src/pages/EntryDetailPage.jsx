@@ -137,9 +137,7 @@ function EntryDetailPage() {
   return (
     <MainLayout>
       <section className="page-header detail-page-header">
-        <button className="back-button" onClick={() => navigate(-1)}>
-          ← Geri
-        </button>
+        <button type="button" className="back-button" onClick={() => navigate(-1)}>← Geri</button>
         <h2>Post</h2>
       </section>
 

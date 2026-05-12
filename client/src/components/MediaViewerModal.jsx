@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Heart,
   MessageCircle,
@@ -11,12 +12,23 @@ import {
 
 import DeleteEntryConfirmModal from "./DeleteEntryConfirmModal.jsx";
 import EditEntryModal from "./EditEntryModal.jsx";
+import QuoteModal from "./QuoteModal.jsx";
 import {
   createComment,
   deleteEntry,
   getEntryDetail,
+  toggleEntryLike,
+  toggleEntryRepost,
 } from "../api/entryApi.js";
 import { uploadMediaFile } from "../api/uploadApi.js";
+
+function getCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem("user"));
+  } catch {
+    return null;
+  }
+}
 
 function Avatar({ user }) {
   return (
@@ -62,6 +74,18 @@ function isUpdated(entry) {
   return updatedTime > createdTime + 1000;
 }
 
+function getEntryDateText(entry) {
+  const updated = isUpdated(entry);
+  const shownDate = updated ? entry?.updated_at : entry?.created_at;
+  const fullDateTime = formatFullDateTime(shownDate);
+
+  if (!fullDateTime) return "";
+
+  return updated
+    ? `${fullDateTime} tarihinde güncellendi`
+    : fullDateTime;
+}
+
 function SmallMediaPreview({ media, onRemove }) {
   if (!media) return null;
 
@@ -80,6 +104,420 @@ function SmallMediaPreview({ media, onRemove }) {
   );
 }
 
+function MediaPreview({ media }) {
+  if (!Array.isArray(media) || media.length === 0) return null;
+
+  return (
+    <div className="media-viewer-comment-media-list">
+      {media.map((item) => (
+        <div className="media-viewer-comment-media" key={item.id || item.media_url}>
+          {item.media_type === "video" ? (
+            <video src={item.media_url} controls />
+          ) : (
+            <img src={item.media_url} alt="comment media" />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MediaViewerMainActions({ entry }) {
+  const [liked, setLiked] = useState(Boolean(entry?.viewer_state?.is_liked_by_me));
+  const [reposted, setReposted] = useState(Boolean(entry?.viewer_state?.is_reposted_by_me));
+  const [likesCount, setLikesCount] = useState(entry?.stats?.likes_count || 0);
+  const [repostsCount, setRepostsCount] = useState(entry?.stats?.reposts_count || 0);
+  const [likeLoading, setLikeLoading] = useState(false);
+  const [repostLoading, setRepostLoading] = useState(false);
+  const [repostMenuOpen, setRepostMenuOpen] = useState(false);
+  const [quoteModalOpen, setQuoteModalOpen] = useState(false);
+
+  useEffect(() => {
+    setLiked(Boolean(entry?.viewer_state?.is_liked_by_me));
+    setReposted(Boolean(entry?.viewer_state?.is_reposted_by_me));
+    setLikesCount(entry?.stats?.likes_count || 0);
+    setRepostsCount(entry?.stats?.reposts_count || 0);
+  }, [entry]);
+
+  async function handleLike() {
+    if (likeLoading || entry?.is_deleted) return;
+
+    const nextLiked = !liked;
+
+    setLiked(nextLiked);
+    setLikesCount((current) => current + (nextLiked ? 1 : -1));
+    setLikeLoading(true);
+
+    try {
+      await toggleEntryLike(entry.id);
+    } catch {
+      setLiked(!nextLiked);
+      setLikesCount((current) => current + (nextLiked ? -1 : 1));
+    } finally {
+      setLikeLoading(false);
+    }
+  }
+
+  async function handleRepost() {
+    if (repostLoading || entry?.is_deleted) return;
+
+    const nextReposted = !reposted;
+
+    setRepostMenuOpen(false);
+    setReposted(nextReposted);
+    setRepostsCount((current) => current + (nextReposted ? 1 : -1));
+    setRepostLoading(true);
+
+    try {
+      await toggleEntryRepost(entry.id);
+    } catch {
+      setReposted(!nextReposted);
+      setRepostsCount((current) => current + (nextReposted ? -1 : 1));
+    } finally {
+      setRepostLoading(false);
+    }
+  }
+
+  function handleQuoteClick() {
+    setRepostMenuOpen(false);
+    setQuoteModalOpen(true);
+  }
+
+  function handleQuoteCreated() {
+    setQuoteModalOpen(false);
+  }
+
+  return (
+    <>
+      <div className="media-viewer-actions">
+        <span>
+          <MessageCircle size={17} />
+          {entry?.stats?.comments_count || 0}
+        </span>
+
+        <div className="repost-action-wrapper media-viewer-repost-wrapper">
+          <button
+            type="button"
+            className={`media-viewer-main-action repost-button ${reposted ? "reposted" : ""}`}
+            onClick={() => setRepostMenuOpen((current) => !current)}
+            disabled={repostLoading}
+          >
+            <Repeat2 size={17} />
+            {repostsCount}
+          </button>
+
+          {repostMenuOpen && (
+            <div className="repost-menu media-viewer-repost-menu">
+              <button type="button" onClick={handleRepost}>
+                <Repeat2 size={17} />
+                <span>{reposted ? "Repostu kaldır" : "Repost"}</span>
+              </button>
+
+              <button type="button" onClick={handleQuoteClick}>
+                <PenLine size={17} />
+                <span>Quote</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          className={`media-viewer-main-action like-button ${liked ? "liked" : ""}`}
+          onClick={handleLike}
+          disabled={likeLoading}
+        >
+          <Heart size={17} fill={liked ? "currentColor" : "none"} />
+          {likesCount}
+        </button>
+      </div>
+
+      {quoteModalOpen && (
+        <QuoteModal
+          originalEntry={entry}
+          onClose={() => setQuoteModalOpen(false)}
+          onCreated={handleQuoteCreated}
+        />
+      )}
+    </>
+  );
+}
+
+function MediaViewerComment({
+  commentItem,
+  onOpenCommentDetail,
+  onDeleted,
+  onUpdated,
+}) {
+  const currentUser = getCurrentUser();
+
+  const [localComment, setLocalComment] = useState(commentItem);
+  const [liked, setLiked] = useState(Boolean(commentItem.viewer_state?.is_liked_by_me));
+  const [reposted, setReposted] = useState(Boolean(commentItem.viewer_state?.is_reposted_by_me));
+  const [likesCount, setLikesCount] = useState(commentItem.stats?.likes_count || 0);
+  const [repostsCount, setRepostsCount] = useState(commentItem.stats?.reposts_count || 0);
+  const [likeLoading, setLikeLoading] = useState(false);
+  const [repostLoading, setRepostLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [ownerMenuOpen, setOwnerMenuOpen] = useState(false);
+  const [repostMenuOpen, setRepostMenuOpen] = useState(false);
+  const [quoteModalOpen, setQuoteModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  useEffect(() => {
+    setLocalComment(commentItem);
+    setLiked(Boolean(commentItem.viewer_state?.is_liked_by_me));
+    setReposted(Boolean(commentItem.viewer_state?.is_reposted_by_me));
+    setLikesCount(commentItem.stats?.likes_count || 0);
+    setRepostsCount(commentItem.stats?.reposts_count || 0);
+  }, [commentItem]);
+
+  const canManageEntry =
+    String(currentUser?.id) === String(localComment.author?.id) &&
+    !localComment.is_deleted &&
+    localComment.type !== "REPOST";
+
+  const dateText = getEntryDateText(localComment);
+
+  async function handleLike(event) {
+    event.stopPropagation();
+
+    if (likeLoading || localComment.is_deleted) return;
+
+    const nextLiked = !liked;
+
+    setLiked(nextLiked);
+    setLikesCount((current) => current + (nextLiked ? 1 : -1));
+    setLikeLoading(true);
+
+    try {
+      await toggleEntryLike(localComment.id);
+    } catch {
+      setLiked(!nextLiked);
+      setLikesCount((current) => current + (nextLiked ? -1 : 1));
+    } finally {
+      setLikeLoading(false);
+    }
+  }
+
+  async function handleRepost(event) {
+    event.stopPropagation();
+
+    if (repostLoading || localComment.is_deleted) return;
+
+    const nextReposted = !reposted;
+
+    setRepostMenuOpen(false);
+    setReposted(nextReposted);
+    setRepostsCount((current) => current + (nextReposted ? 1 : -1));
+    setRepostLoading(true);
+
+    try {
+      await toggleEntryRepost(localComment.id);
+    } catch {
+      setReposted(!nextReposted);
+      setRepostsCount((current) => current + (nextReposted ? -1 : 1));
+    } finally {
+      setRepostLoading(false);
+    }
+  }
+
+  async function handleDeleteEntry() {
+    if (deleteLoading) return;
+
+    setDeleteLoading(true);
+
+    try {
+      await deleteEntry(localComment.id);
+      setDeleteModalOpen(false);
+
+      if (onDeleted) {
+        onDeleted(localComment.id);
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
+  function handleUpdatedEntry(updatedItem) {
+    const updatedEntry = updatedItem?.entry || updatedItem;
+
+    const nextComment = {
+      ...localComment,
+      ...updatedEntry,
+    };
+
+    setLocalComment(nextComment);
+    setEditModalOpen(false);
+
+    if (onUpdated) {
+      onUpdated(nextComment);
+    }
+  }
+
+  function handleQuoteClick(event) {
+    event.stopPropagation();
+    setRepostMenuOpen(false);
+    setQuoteModalOpen(true);
+  }
+
+  return (
+    <>
+      <article
+        className="media-viewer-comment clickable-media-viewer-comment"
+        onClick={() => onOpenCommentDetail(localComment.id)}
+      >
+        <Avatar user={localComment.author} />
+
+        <div className="media-viewer-comment-body">
+          <div className="media-viewer-comment-header">
+            <div className="entry-author-line">
+              <strong>{localComment.author?.full_name}</strong>
+              <span>@{localComment.author?.username}</span>
+            </div>
+
+            {canManageEntry && (
+              <div className="entry-owner-menu-wrapper">
+                <button
+                  type="button"
+                  className="entry-owner-menu-button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setOwnerMenuOpen((current) => !current);
+                  }}
+                >
+                  <MoreHorizontal size={17} />
+                </button>
+
+                {ownerMenuOpen && (
+                  <div
+                    className="entry-owner-menu media-viewer-comment-owner-menu"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOwnerMenuOpen(false);
+                        setEditModalOpen(true);
+                      }}
+                    >
+                      <PenLine size={16} />
+                      <span>Entry'i güncelle</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOwnerMenuOpen(false);
+                        setDeleteModalOpen(true);
+                      }}
+                    >
+                      <Trash2 size={16} />
+                      <span>Entry'i sil</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <p>{localComment.is_deleted ? "Bu gönderi silinmiş." : localComment.content}</p>
+
+          <MediaPreview media={localComment.media} />
+
+          {dateText && <p className="media-viewer-comment-date">{dateText}</p>}
+
+          <div className="media-viewer-comment-actions">
+            <button
+              type="button"
+              className="media-viewer-comment-action comment-button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenCommentDetail(localComment.id);
+              }}
+            >
+              <MessageCircle size={15} />
+              <span>{localComment.stats?.comments_count || 0}</span>
+            </button>
+
+            <div className="repost-action-wrapper media-viewer-comment-repost-wrapper">
+              <button
+                type="button"
+                className={`media-viewer-comment-action repost-button ${
+                  reposted ? "reposted" : ""
+                }`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setRepostMenuOpen((current) => !current);
+                }}
+                disabled={repostLoading}
+              >
+                <Repeat2 size={15} />
+                <span>{repostsCount}</span>
+              </button>
+
+              {repostMenuOpen && (
+                <div
+                  className="repost-menu media-viewer-comment-repost-menu"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <button type="button" onClick={handleRepost}>
+                    <Repeat2 size={17} />
+                    <span>{reposted ? "Repostu kaldır" : "Repost"}</span>
+                  </button>
+
+                  <button type="button" onClick={handleQuoteClick}>
+                    <PenLine size={17} />
+                    <span>Quote</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className={`media-viewer-comment-action like-button ${
+                liked ? "liked" : ""
+              }`}
+              onClick={handleLike}
+              disabled={likeLoading}
+            >
+              <Heart size={15} fill={liked ? "currentColor" : "none"} />
+              <span>{likesCount}</span>
+            </button>
+          </div>
+        </div>
+      </article>
+
+      {quoteModalOpen && (
+        <QuoteModal
+          originalEntry={localComment}
+          onClose={() => setQuoteModalOpen(false)}
+          onCreated={() => setQuoteModalOpen(false)}
+        />
+      )}
+
+      {editModalOpen && (
+        <EditEntryModal
+          entry={localComment}
+          embeddedOriginalEntry={null}
+          onClose={() => setEditModalOpen(false)}
+          onUpdated={handleUpdatedEntry}
+        />
+      )}
+
+      {deleteModalOpen && (
+        <DeleteEntryConfirmModal
+          deleting={deleteLoading}
+          onCancel={() => setDeleteModalOpen(false)}
+          onConfirm={handleDeleteEntry}
+        />
+      )}
+    </>
+  );
+}
+
 function MediaViewerModal({
   entry,
   media,
@@ -87,7 +525,8 @@ function MediaViewerModal({
   onEntryDeleted,
   onEntryUpdated,
 }) {
-  const currentUser = JSON.parse(localStorage.getItem("user"));
+  const navigate = useNavigate();
+  const currentUser = getCurrentUser();
 
   const [detail, setDetail] = useState(null);
   const [comment, setComment] = useState("");
@@ -214,6 +653,42 @@ function MediaViewerModal({
     }
   }
 
+  function handleCommentDeleted(commentId) {
+    setDetail((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        children: current.children.filter(
+          (child) => Number(child.id) !== Number(commentId)
+        ),
+      };
+    });
+  }
+
+  function handleCommentUpdated(updatedComment) {
+    setDetail((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        children: current.children.map((child) =>
+          Number(child.id) === Number(updatedComment.id)
+            ? {
+                ...child,
+                ...updatedComment,
+              }
+            : child
+        ),
+      };
+    });
+  }
+
+  function handleOpenCommentDetail(commentId) {
+    onClose();
+    navigate(`/entries/${commentId}`);
+  }
+
   useEffect(() => {
     fetchDetail();
   }, [entry?.id]);
@@ -225,12 +700,7 @@ function MediaViewerModal({
     !shownEntry?.is_deleted &&
     shownEntry?.type !== "REPOST";
 
-  const updated = isUpdated(shownEntry);
-  const shownDate = updated ? shownEntry?.updated_at : shownEntry?.created_at;
-  const fullDateTime = formatFullDateTime(shownDate);
-  const dateText = updated
-    ? `${fullDateTime} tarihinde güncellendi`
-    : fullDateTime;
+  const dateText = getEntryDateText(shownEntry);
 
   return (
     <div className="media-viewer-backdrop">
@@ -304,22 +774,7 @@ function MediaViewerModal({
 
             {dateText && <p className="media-viewer-date">{dateText}</p>}
 
-            <div className="media-viewer-actions">
-              <span>
-                <MessageCircle size={17} />
-                {shownEntry.stats?.comments_count || 0}
-              </span>
-
-              <span>
-                <Repeat2 size={17} />
-                {shownEntry.stats?.reposts_count || 0}
-              </span>
-
-              <span>
-                <Heart size={17} />
-                {shownEntry.stats?.likes_count || 0}
-              </span>
-            </div>
+            <MediaViewerMainActions entry={shownEntry} />
           </div>
 
           <form className="media-viewer-reply-box" onSubmit={handleCreateComment}>
@@ -364,18 +819,13 @@ function MediaViewerModal({
           {!loading && comments.length > 0 && (
             <div className="media-viewer-comments">
               {comments.map((commentItem) => (
-                <article className="media-viewer-comment" key={commentItem.id}>
-                  <Avatar user={commentItem.author} />
-
-                  <div>
-                    <div className="entry-author-line">
-                      <strong>{commentItem.author?.full_name}</strong>
-                      <span>@{commentItem.author?.username}</span>
-                    </div>
-
-                    <p>{commentItem.content}</p>
-                  </div>
-                </article>
+                <MediaViewerComment
+                  key={commentItem.id}
+                  commentItem={commentItem}
+                  onOpenCommentDetail={handleOpenCommentDetail}
+                  onDeleted={handleCommentDeleted}
+                  onUpdated={handleCommentUpdated}
+                />
               ))}
             </div>
           )}
