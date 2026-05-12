@@ -25,7 +25,7 @@ function DeleteEntryConfirmModal({ onCancel, onConfirm, deleting }) {
             onClick={onConfirm}
             disabled={deleting}
           >
-            {deleting ? "Siliniyor..." : "Sil"}
+            {deleting ? "Siliniyor..." : "Entry’i sil"}
           </button>
         </div>
       </section>
