@@ -923,38 +923,6 @@ textarea {
   white-space: pre-wrap;
 }
 
-.quote-modal-footer {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.quote-modal-footer button {
-  border: none;
-  border-radius: 999px;
-  background-color: #111827;
-  color: white;
-  padding: 10px 18px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.quote-modal-footer button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.media-url-input {
-  width: 100%;
-  border: 1px solid #d1d5db;
-  border-radius: 14px;
-  padding: 10px 12px;
-  font-size: 14px;
-  outline: none;
-}
-
-.media-url-input:focus {
-  border-color: #111827;
-}
 
 .media-preview {
   border: 1px solid #e5e7eb;
