@@ -128,7 +128,9 @@ function EmbeddedEntry({ entry, onClick, onOpenMedia }) {
         </div>
       </div>
 
-      <p>{entry.is_deleted ? "Bu gönderi silinmiş." : entry.content}</p>
+      {(entry.is_deleted || entry.content) && (
+        <p>{entry.is_deleted ? "Bu gönderi silinmiş." : entry.content}</p>
+      )}
 
       <MediaRenderer media={entry.media} entry={entry} onOpen={onOpenMedia} />
     </div>
