@@ -77,7 +77,6 @@ function EditEntryModal({ entry, embeddedOriginalEntry, onClose, onUpdated }) {
     try {
       const result = await updateEntry(entry.id, {
         content: normalizedContent,
-        media,
       });
 
       onUpdated(result.data);

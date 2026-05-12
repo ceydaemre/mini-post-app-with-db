@@ -1368,7 +1368,7 @@ async function getEntryLikesService(entry_id, current_user_id, limit = 10, offse
 }
 
 
-async function updateEntryService(user_id, entry_id, { content, media }) {
+async function updateEntryService(user_id, entry_id, { content }) {
     user_id = Number(user_id);
     entry_id = Number(entry_id);
 
@@ -1385,12 +1385,8 @@ async function updateEntryService(user_id, entry_id, { content, media }) {
             ? ""
             : String(content).trim();
 
-    const normalizedMedia = Array.isArray(media)
-        ? media.filter((item) => item && item.media_url && item.media_type)
-        : [];
-
-    if (!normalizedContent && normalizedMedia.length === 0) {
-        throw new Error("Entry için yazı veya medya bulunmalıdır.");
+    if (!normalizedContent) {
+        throw new Error("Entry content boş olamaz.");
     }
 
     const client = await pool.connect();
@@ -1437,32 +1433,6 @@ async function updateEntryService(user_id, entry_id, { content, media }) {
             normalizedContent || null,
             entry_id
         ]);
-
-        const deleteMediaQuery = `
-            DELETE FROM entry_media
-            WHERE entry_id = $1
-        `;
-
-        await client.query(deleteMediaQuery, [entry_id]);
-
-        if (normalizedMedia.length > 0) {
-            for (const item of normalizedMedia) {
-                const insertMediaQuery = `
-                    INSERT INTO entry_media (
-                        entry_id,
-                        media_url,
-                        media_type
-                    )
-                    VALUES ($1, $2, $3)
-                `;
-
-                await client.query(insertMediaQuery, [
-                    entry_id,
-                    item.media_url,
-                    item.media_type
-                ]);
-            }
-        }
 
         await client.query("COMMIT");
 

@@ -72,12 +72,11 @@ export function toggleEntryRepost(entryId) {
 }
 
 
-export function updateEntry(entryId, { content, media = [] }) {
+export function updateEntry(entryId, { content }) {
   return apiRequest(`/api/entries/${entryId}`, {
     method: "PATCH",
     body: {
       content,
-      media,
     },
   });
 }
