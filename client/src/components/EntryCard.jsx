@@ -391,9 +391,11 @@ function EntryCard({
           <p className="entry-label">{localItem.repost_info.label}</p>
         )}
 
-        <p className="entry-content">
-          {entry.is_deleted ? "Bu gönderi silinmiş." : entry.content}
-        </p>
+        {(entry.is_deleted || entry.content) && (
+          <p className="entry-content">
+            {entry.is_deleted ? "Bu gönderi silinmiş." : entry.content}
+          </p>
+        )}
 
         <MediaRenderer media={entry.media} entry={entry} onOpen={handleOpenMedia} />
 
