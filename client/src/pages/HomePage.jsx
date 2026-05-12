@@ -86,7 +86,7 @@ function HomePage() {
 
         return [newTimelineItem, ...filteredItems];
       });
-    } catch (error) {
+    } catch {
       await fetchTimeline(feed, null);
     }
   }
