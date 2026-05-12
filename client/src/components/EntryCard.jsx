@@ -403,7 +403,7 @@ function EntryCard({
           onOpenMedia={handleOpenMedia}
         />
 
-        {showCreatedAt && dateText && (
+        {dateText && (
           <p className="entry-created-at">{dateText}</p>
         )}
 
