@@ -104,19 +104,27 @@ function SmallMediaPreview({ media, onRemove }) {
   );
 }
 
-function MediaPreview({ media }) {
+function MediaPreview({ media, entry, onOpenMedia }) {
   if (!Array.isArray(media) || media.length === 0) return null;
 
   return (
     <div className="media-viewer-comment-media-list">
       {media.map((item) => (
-        <div className="media-viewer-comment-media" key={item.id || item.media_url}>
+        <button
+          type="button"
+          className="media-viewer-comment-media"
+          key={item.id || item.media_url}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenMedia(entry, item);
+          }}
+        >
           {item.media_type === "video" ? (
-            <video src={item.media_url} controls />
+            <video src={item.media_url} />
           ) : (
             <img src={item.media_url} alt="comment media" />
           )}
-        </div>
+        </button>
       ))}
     </div>
   );
@@ -250,6 +258,7 @@ function MediaViewerMainActions({ entry, onOpenDetail }) {
 function MediaViewerComment({
   commentItem,
   onOpenCommentDetail,
+  onOpenMedia,
   onDeleted,
   onUpdated,
 }) {
@@ -428,7 +437,11 @@ function MediaViewerComment({
 
           <p>{localComment.is_deleted ? "Bu gönderi silinmiş." : localComment.content}</p>
 
-          <MediaPreview media={localComment.media} />
+          <MediaPreview
+            media={localComment.media}
+            entry={localComment}
+            onOpenMedia={onOpenMedia}
+          />
 
           {dateText && <p className="media-viewer-comment-date">{dateText}</p>}
 
@@ -532,6 +545,8 @@ function MediaViewerModal({
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
 
+  const [activeEntry, setActiveEntry] = useState(entry);
+  const [activeMedia, setActiveMedia] = useState(media);
   const [detail, setDetail] = useState(null);
   const [comment, setComment] = useState("");
   const [uploadedMedia, setUploadedMedia] = useState(null);
@@ -545,13 +560,13 @@ function MediaViewerModal({
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   async function fetchDetail() {
-    if (!entry?.id) return;
+    if (!activeEntry?.id) return;
 
     setLoading(true);
     setError("");
 
     try {
-      const result = await getEntryDetail(entry.id);
+      const result = await getEntryDetail(activeEntry.id);
       setDetail(result.data);
     } catch (error) {
       setError(error.message);
@@ -594,7 +609,7 @@ function MediaViewerModal({
     setError("");
 
     try {
-      await createComment(entry.id, {
+      await createComment(activeEntry.id, {
         content: normalizedComment,
         media: mediaPayload,
       });
@@ -693,11 +708,23 @@ function MediaViewerModal({
     navigate(`/entries/${commentId}`);
   }
 
+  function handleOpenMedia(mediaEntry, mediaItem) {
+    setActiveEntry(mediaEntry);
+    setActiveMedia(mediaItem);
+    setDetail(null);
+  }
+
+  useEffect(() => {
+    setActiveEntry(entry);
+    setActiveMedia(media);
+    setDetail(null);
+  }, [entry?.id, media?.id, media?.media_url]);
+
   useEffect(() => {
     fetchDetail();
-  }, [entry?.id]);
+  }, [activeEntry?.id]);
 
-  const shownEntry = detail?.entry || entry;
+  const shownEntry = detail?.entry || activeEntry;
   const comments = detail?.children || [];
   const canManageEntry =
     String(currentUser?.id) === String(shownEntry?.author?.id) &&
@@ -714,10 +741,10 @@ function MediaViewerModal({
 
       <section className="media-viewer-shell">
         <div className="media-viewer-media-panel">
-          {media.media_type === "video" ? (
-            <video src={media.media_url} controls autoPlay />
+          {activeMedia.media_type === "video" ? (
+            <video src={activeMedia.media_url} controls autoPlay />
           ) : (
-            <img src={media.media_url} alt="entry media" />
+            <img src={activeMedia.media_url} alt="entry media" />
           )}
         </div>
 
@@ -832,6 +859,7 @@ function MediaViewerModal({
                   key={commentItem.id}
                   commentItem={commentItem}
                   onOpenCommentDetail={handleOpenCommentDetail}
+                  onOpenMedia={handleOpenMedia}
                   onDeleted={handleCommentDeleted}
                   onUpdated={handleCommentUpdated}
                 />
