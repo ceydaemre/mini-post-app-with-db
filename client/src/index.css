@@ -374,11 +374,6 @@ textarea {
   white-space: pre-wrap;
 }
 
-.entry-created-at {
-  margin: -2px 0 10px;
-  color: #64748b;
-  font-size: 14px;
-}
 
 .entry-media-list {
   display: flex;
@@ -1374,12 +1369,6 @@ textarea {
 
 
 
-.detail-selected-entry-card .entry-created-at {
-  text-align: right;
-  margin: 8px 0 10px !important;
-  color: #64748b;
-  font-size: 14px;
-}
 
 .detail-selected-entry-card .entry-actions {
   display: grid !important;
