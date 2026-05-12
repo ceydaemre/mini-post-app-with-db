@@ -2050,18 +2050,6 @@ textarea {
   justify-content: center;
 }
 
-.compose-actions,
-.modal-compose-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.modal-compose-actions button,
-.compose-actions button {
-  align-self: center;
-}
 
 .inline-selected-media {
   margin-top: 10px;
