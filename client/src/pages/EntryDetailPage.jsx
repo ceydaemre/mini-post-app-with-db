@@ -106,6 +106,16 @@ function EntryDetailPage() {
 
   const isCommentDetail = detail?.entry_type === "COMMENT";
 
+  const replyUser =
+    currentUser &&
+    String(currentUser.id) === String(detail?.entry?.author?.id)
+      ? {
+          ...currentUser,
+          profile_image_url:
+            currentUser.profile_image_url || detail.entry.author?.profile_image_url,
+        }
+      : currentUser;
+
   const contextEntries = [];
 
   if (isCommentDetail && detail?.root_context) {
@@ -193,7 +203,14 @@ function EntryDetailPage() {
                 onSubmit={handleCreateComment}
               >
                 <div className="avatar reply-avatar">
-                  {currentUser?.full_name?.charAt(0)?.toUpperCase() || "?"}
+                  {replyUser?.profile_image_url ? (
+                    <img
+                      src={replyUser.profile_image_url}
+                      alt={replyUser.full_name || "avatar"}
+                    />
+                  ) : (
+                    replyUser?.full_name?.charAt(0)?.toUpperCase() || "?"
+                  )}
                 </div>
 
                 <div className="reply-upload-area">
