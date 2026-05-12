@@ -95,6 +95,7 @@ async function getChildrenByEntryIdService(entry_id, current_user_id = null) {
         SELECT *
         FROM entries
         WHERE parent_entry_id = $1
+          AND is_deleted = false
         ORDER BY created_at ASC
     `;
 
