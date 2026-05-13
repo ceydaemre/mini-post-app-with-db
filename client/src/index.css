@@ -2783,3 +2783,124 @@ textarea {
   opacity: 0.65;
   cursor: not-allowed;
 }
+
+.search-page-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.search-input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 14px 18px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 15px;
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
+}
+
+.search-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.search-tabs button {
+  border: 0;
+  padding: 14px 12px;
+  background: transparent;
+  color: #64748b;
+  font-weight: 800;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+}
+
+.search-tabs button:hover {
+  background: #f8fafc;
+  color: #111827;
+}
+
+.search-tabs .active-search-tab {
+  color: #111827;
+  border-bottom-color: #111827;
+}
+
+.search-user-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid #f1f5f9;
+}
+
+.search-user-card {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #f1f5f9;
+  padding: 16px 4px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-user-card:hover {
+  background: #f8fafc;
+}
+
+.search-user-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: #e5e7eb;
+  color: #111827;
+  font-weight: 800;
+}
+
+.search-user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.search-user-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.search-user-info strong {
+  color: #111827;
+  font-size: 15px;
+}
+
+.search-user-info span {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.search-user-info small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.search-empty-state {
+  margin-top: 12px;
+}
+
+.search-entry-list {
+  margin-top: 0;
+}
