@@ -3,7 +3,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import MainLayout from "../layouts/MainLayout.jsx";
 import EntryCard from "../components/EntryCard.jsx";
+import DeleteEntryConfirmModal from "../components/DeleteEntryConfirmModal.jsx";
 import { searchEntries, searchUsers } from "../api/searchApi.js";
+import { toggleFollow } from "../api/userApi.js";
 
 const VALID_SEARCH_TABS = ["users", "entries"];
 const SEARCH_LIMIT = 10;
@@ -44,15 +46,28 @@ function normalizeRecentSearchQuery(query) {
   return query.trim().replace(/\s+/g, " ");
 }
 
-function SearchUserCard({ user }) {
+function SearchUserCard({ user, followLoading, onFollowClick }) {
   const navigate = useNavigate();
 
   function handleClick() {
     navigate(`/users/${user.id}`);
   }
 
+  function handleKeyDown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleClick();
+    }
+  }
+
   return (
-    <button type="button" className="search-user-card" onClick={handleClick}>
+    <article
+      className="search-user-card"
+      role="button"
+      tabIndex={0}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+    >
       <div className="search-user-avatar">
         {user.profile_image_url ? (
           <img src={user.profile_image_url} alt={user.full_name || "avatar"} />
@@ -66,9 +81,25 @@ function SearchUserCard({ user }) {
         <span>@{user.username}</span>
 
         {user.is_me && <small>Sen</small>}
-        {!user.is_me && user.is_following && <small>Takip ediliyor</small>}
       </div>
-    </button>
+
+      {!user.is_me && (
+        <button
+          type="button"
+          className={`search-user-follow-button ${
+            user.is_following ? "following" : ""
+          }`}
+          onClick={(event) => onFollowClick(event, user)}
+          disabled={followLoading}
+        >
+          {followLoading
+            ? "İşleniyor..."
+            : user.is_following
+              ? "Takip Ediliyor"
+              : "Takip Et"}
+        </button>
+      )}
+    </article>
   );
 }
 
@@ -126,6 +157,8 @@ function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [searchFollowLoadingUserId, setSearchFollowLoadingUserId] = useState(null);
+  const [userToUnfollow, setUserToUnfollow] = useState(null);
   const [recentSearches, setRecentSearches] = useState(() =>
     getRecentSearchesFromStorage()
   );
@@ -289,6 +322,68 @@ function SearchPage() {
     });
   }
 
+  function updateSearchUserFollowState(userId, isFollowing) {
+    setItems((currentItems) =>
+      currentItems.map((item) =>
+        Number(item.id) === Number(userId)
+          ? {
+              ...item,
+              is_following: isFollowing,
+            }
+          : item
+      )
+    );
+  }
+
+  async function applySearchUserFollowToggle(user, nextIsFollowing) {
+    if (!user?.id || searchFollowLoadingUserId) return false;
+
+    const previousIsFollowing = Boolean(user.is_following);
+
+    setSearchFollowLoadingUserId(user.id);
+    setError("");
+    updateSearchUserFollowState(user.id, nextIsFollowing);
+
+    try {
+      const result = await toggleFollow(user.id);
+      const isFollowingFromApi = Boolean(result?.data?.is_following);
+
+      updateSearchUserFollowState(user.id, isFollowingFromApi);
+
+      return true;
+    } catch (error) {
+      updateSearchUserFollowState(user.id, previousIsFollowing);
+      setError(error.message);
+
+      return false;
+    } finally {
+      setSearchFollowLoadingUserId(null);
+    }
+  }
+
+  function handleSearchUserFollowClick(event, user) {
+    event.stopPropagation();
+
+    if (searchFollowLoadingUserId || !user?.id) return;
+
+    if (user.is_following) {
+      setUserToUnfollow(user);
+      return;
+    }
+
+    applySearchUserFollowToggle(user, true);
+  }
+
+  async function handleConfirmSearchUnfollow() {
+    if (!userToUnfollow) return;
+
+    const isSuccessful = await applySearchUserFollowToggle(userToUnfollow, false);
+
+    if (isSuccessful) {
+      setUserToUnfollow(null);
+    }
+  }
+
   useEffect(() => {
     setSearchText(queryFromUrl);
     setActiveTab(tabFromUrl);
@@ -432,7 +527,14 @@ function SearchPage() {
         {!loading && activeTab === "users" && items.length > 0 && (
           <section className="search-user-list">
             {items.map((user) => (
-              <SearchUserCard key={user.id} user={user} />
+              <SearchUserCard
+                key={user.id}
+                user={user}
+                followLoading={
+                  Number(searchFollowLoadingUserId) === Number(user.id)
+                }
+                onFollowClick={handleSearchUserFollowClick}
+              />
             ))}
           </section>
         )}
@@ -457,6 +559,20 @@ function SearchPage() {
           >
             {loadingMore ? "Yükleniyor..." : "Daha fazla yükle"}
           </button>
+        )}
+
+        {userToUnfollow && (
+          <DeleteEntryConfirmModal
+            deleting={
+              Number(searchFollowLoadingUserId) === Number(userToUnfollow.id)
+            }
+            title="Takipten çıkılsın mı?"
+            description="Bu kullanıcıyı takipten çıkmak istediğine emin misin?"
+            confirmText="Takipten çık"
+            loadingText="Çıkılıyor..."
+            onCancel={() => setUserToUnfollow(null)}
+            onConfirm={handleConfirmSearchUnfollow}
+          />
         )}
       </section>
     </MainLayout>
