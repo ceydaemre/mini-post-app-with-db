@@ -5,7 +5,10 @@ import MainLayout from "../layouts/MainLayout.jsx";
 import EntryCard from "../components/EntryCard.jsx";
 import EditProfileModal from "../components/EditProfileModal.jsx";
 import DeleteEntryConfirmModal from "../components/DeleteEntryConfirmModal.jsx";
+import UserListModal from "../components/UserListModal.jsx";
 import {
+  getUserFollowers,
+  getUserFollowing,
   getUserLikes,
   getUserMedia,
   getUserPosts,
@@ -16,6 +19,7 @@ import {
 
 const VALID_TABS = ["posts", "replies", "likes", "media"];
 const PROFILE_ITEMS_LIMIT = 10;
+const USER_LIST_LIMIT = 10;
 
 function normalizeEntryItem(rawItem) {
   if (rawItem.entry) {
@@ -66,6 +70,13 @@ function ProfilePage() {
   const [itemsLoading, setItemsLoading] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [unfollowModalOpen, setUnfollowModalOpen] = useState(false);
+  const [userListModalType, setUserListModalType] = useState(null);
+  const [userListItems, setUserListItems] = useState([]);
+  const [userListHasMore, setUserListHasMore] = useState(false);
+  const [userListNextOffset, setUserListNextOffset] = useState(0);
+  const [userListLoading, setUserListLoading] = useState(false);
+  const [userListLoadingMore, setUserListLoadingMore] = useState(false);
+  const [userListError, setUserListError] = useState("");
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [error, setError] = useState("");
 
@@ -298,6 +309,84 @@ function ProfilePage() {
     }
   }
 
+  async function fetchUserList(type, { offset = 0, append = false } = {}) {
+    if (!profileUser?.id) return;
+
+    if (append) {
+      setUserListLoadingMore(true);
+    } else {
+      setUserListLoading(true);
+    }
+
+    setUserListError("");
+
+    try {
+      const pagination = {
+        limit: USER_LIST_LIMIT,
+        offset,
+      };
+
+      const result =
+        type === "followers"
+          ? await getUserFollowers(profileUser.id, pagination)
+          : await getUserFollowing(profileUser.id, pagination);
+
+      const rawItems =
+        result?.data?.items ||
+        result?.data?.followers ||
+        result?.data?.following ||
+        result?.data?.users ||
+        result?.data ||
+        [];
+
+      const nextItems = Array.isArray(rawItems) ? rawItems : [];
+
+      setUserListItems((currentItems) =>
+        append ? [...currentItems, ...nextItems] : nextItems
+      );
+
+      setUserListHasMore(Boolean(result?.data?.pagination?.has_more));
+      setUserListNextOffset(result?.data?.pagination?.next_offset || 0);
+    } catch (error) {
+      if (!append) {
+        setUserListItems([]);
+      }
+
+      setUserListHasMore(false);
+      setUserListNextOffset(0);
+      setUserListError(error.message);
+    } finally {
+      setUserListLoading(false);
+      setUserListLoadingMore(false);
+    }
+  }
+
+  function handleOpenUserList(type) {
+    setUserListModalType(type);
+    setUserListItems([]);
+    setUserListHasMore(false);
+    setUserListNextOffset(0);
+    setUserListError("");
+    fetchUserList(type);
+  }
+
+  function handleCloseUserList() {
+    setUserListModalType(null);
+    setUserListItems([]);
+    setUserListHasMore(false);
+    setUserListNextOffset(0);
+    setUserListError("");
+  }
+
+  function handleLoadMoreUsers() {
+    if (!userListModalType || userListLoadingMore || !userListHasMore) return;
+
+    fetchUserList(userListModalType, {
+      offset: userListNextOffset,
+      append: true,
+    });
+  }
+
   useEffect(() => {
     const tabFromUrl = getTabFromSearchParams(searchParams);
     setActiveTab(tabFromUrl);
@@ -376,11 +465,23 @@ function ProfilePage() {
                 <strong>{stats.posts_count || 0}</strong>
                 <span>posts</span>
 
-                <strong>{stats.followers_count || 0}</strong>
-                <span>followers</span>
+                <button
+                  type="button"
+                  className="profile-stat-button"
+                  onClick={() => handleOpenUserList("followers")}
+                >
+                  <strong>{stats.followers_count || 0}</strong>
+                  <span>followers</span>
+                </button>
 
-                <strong>{stats.following_count || 0}</strong>
-                <span>following</span>
+                <button
+                  type="button"
+                  className="profile-stat-button"
+                  onClick={() => handleOpenUserList("following")}
+                >
+                  <strong>{stats.following_count || 0}</strong>
+                  <span>following</span>
+                </button>
               </div>
             </div>
           </section>
@@ -467,6 +568,19 @@ function ProfilePage() {
               loadingText="Çıkılıyor..."
               onCancel={() => setUnfollowModalOpen(false)}
               onConfirm={handleConfirmUnfollow}
+            />
+          )}
+
+          {userListModalType && (
+            <UserListModal
+              title={userListModalType === "followers" ? "Followers" : "Following"}
+              users={userListItems}
+              loading={userListLoading}
+              error={userListError}
+              hasMore={userListHasMore}
+              loadingMore={userListLoadingMore}
+              onLoadMore={handleLoadMoreUsers}
+              onClose={handleCloseUserList}
             />
           )}
         </>

@@ -51,3 +51,11 @@ export function getUserLikes(userId, pagination = {}) {
 export function getUserMedia(userId, pagination = {}) {
   return apiRequest(`/api/users/${userId}/media?${buildPaginationQuery(pagination)}`);
 }
+
+export function getUserFollowers(userId, pagination = {}) {
+  return apiRequest(`/api/users/${userId}/followers?${buildPaginationQuery(pagination)}`);
+}
+
+export function getUserFollowing(userId, pagination = {}) {
+  return apiRequest(`/api/users/${userId}/following?${buildPaginationQuery(pagination)}`);
+}
