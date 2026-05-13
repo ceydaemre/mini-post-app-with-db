@@ -76,15 +76,26 @@ function isUpdated(entry) {
   return updatedTime > createdTime + 1000;
 }
 
-function Avatar({ user }) {
+function Avatar({ user, onClick }) {
+  const content = user?.profile_image_url ? (
+    <img src={user.profile_image_url} alt={user.full_name || "avatar"} />
+  ) : (
+    user?.full_name?.charAt(0)?.toUpperCase() || "?"
+  );
+
+  if (!onClick) {
+    return <div className="avatar">{content}</div>;
+  }
+
   return (
-    <div className="avatar">
-      {user?.profile_image_url ? (
-        <img src={user.profile_image_url} alt={user.full_name || "avatar"} />
-      ) : (
-        user?.full_name?.charAt(0)?.toUpperCase() || "?"
-      )}
-    </div>
+    <button
+      type="button"
+      className="avatar avatar-button"
+      onClick={onClick}
+      aria-label={user?.username ? `${user.username} profiline git` : "Profile git"}
+    >
+      {content}
+    </button>
   );
 }
 
@@ -114,18 +125,25 @@ function MediaRenderer({ media, entry, onOpen }) {
   );
 }
 
-function EmbeddedEntry({ entry, onClick, onOpenMedia }) {
+function EmbeddedEntry({ entry, onClick, onOpenMedia, onAuthorClick }) {
   if (!entry) return null;
 
   return (
     <div className="embedded-entry clickable-embedded-entry" onClick={onClick}>
       <div className="embedded-entry-header">
-        <Avatar user={entry.author} />
+        <Avatar
+          user={entry.author}
+          onClick={(event) => onAuthorClick(event, entry.author?.id)}
+        />
 
-        <div className="entry-author-line">
+        <button
+          type="button"
+          className="entry-author-line entry-author-button"
+          onClick={(event) => onAuthorClick(event, entry.author?.id)}
+        >
           <strong>{entry.author?.full_name}</strong>
           <span>@{entry.author?.username}</span>
-        </div>
+        </button>
       </div>
 
       {(entry.is_deleted || entry.content) && (
@@ -296,6 +314,14 @@ function EntryCard({
     navigate(`/entries/${entry.id}`);
   }
 
+  function handleAuthorClick(event, authorId) {
+    event.stopPropagation();
+
+    if (!authorId) return;
+
+    navigate(`/users/${authorId}`);
+  }
+
   function handleOwnerMenuClick(event) {
     event.stopPropagation();
     setOwnerMenuOpen((current) => !current);
@@ -340,16 +366,23 @@ function EntryCard({
       >
         <header className="entry-card-header entry-card-header-with-menu">
           <div className="entry-card-author-group">
-            <Avatar user={entry.author} />
+            <Avatar
+              user={entry.author}
+              onClick={(event) => handleAuthorClick(event, entry.author?.id)}
+            />
 
-            <div className="entry-author-line">
+            <button
+              type="button"
+              className="entry-author-line entry-author-button"
+              onClick={(event) => handleAuthorClick(event, entry.author?.id)}
+            >
               <strong>{entry.author?.full_name}</strong>
               <span>@{entry.author?.username}</span>
 
               {relativeTime && (
                 <span className="entry-relative-time">· {relativeTime}</span>
               )}
-            </div>
+            </button>
           </div>
 
           {canManageEntry && (
@@ -405,6 +438,7 @@ function EntryCard({
           entry={localItem.embedded_original_entry}
           onClick={handleEmbeddedEntryClick}
           onOpenMedia={handleOpenMedia}
+          onAuthorClick={handleAuthorClick}
         />
 
         {dateText && (

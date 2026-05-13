@@ -30,15 +30,26 @@ function getCurrentUser() {
   }
 }
 
-function Avatar({ user }) {
+function Avatar({ user, onClick }) {
+  const content = user?.profile_image_url ? (
+    <img src={user.profile_image_url} alt={user.full_name || "avatar"} />
+  ) : (
+    user?.full_name?.charAt(0)?.toUpperCase() || "?"
+  );
+
+  if (!onClick) {
+    return <div className="avatar">{content}</div>;
+  }
+
   return (
-    <div className="avatar">
-      {user?.profile_image_url ? (
-        <img src={user.profile_image_url} alt={user.full_name || "avatar"} />
-      ) : (
-        user?.full_name?.charAt(0)?.toUpperCase() || "?"
-      )}
-    </div>
+    <button
+      type="button"
+      className="avatar avatar-button"
+      onClick={onClick}
+      aria-label={user?.username ? `${user.username} profiline git` : "Profile git"}
+    >
+      {content}
+    </button>
   );
 }
 
@@ -259,6 +270,7 @@ function MediaViewerComment({
   commentItem,
   onOpenCommentDetail,
   onOpenMedia,
+  onOpenAuthorProfile,
   onDeleted,
   onUpdated,
 }) {
@@ -375,20 +387,32 @@ function MediaViewerComment({
     setQuoteModalOpen(true);
   }
 
+  function handleAuthorClick(event) {
+    event.stopPropagation();
+
+    if (!localComment.author?.id) return;
+
+    onOpenAuthorProfile(localComment.author.id);
+  }
+
   return (
     <>
       <article
         className="media-viewer-comment clickable-media-viewer-comment"
         onClick={() => onOpenCommentDetail(localComment.id)}
       >
-        <Avatar user={localComment.author} />
+        <Avatar user={localComment.author} onClick={handleAuthorClick} />
 
         <div className="media-viewer-comment-body">
           <div className="media-viewer-comment-header">
-            <div className="entry-author-line">
+            <button
+              type="button"
+              className="entry-author-line entry-author-button"
+              onClick={handleAuthorClick}
+            >
               <strong>{localComment.author?.full_name}</strong>
               <span>@{localComment.author?.username}</span>
-            </div>
+            </button>
 
             {canManageEntry && (
               <div className="entry-owner-menu-wrapper">
@@ -712,6 +736,13 @@ function MediaViewerModal({
     navigate(`/entries/${commentId}`);
   }
 
+  function handleOpenAuthorProfile(authorId) {
+    if (!authorId) return;
+
+    onClose();
+    navigate(`/users/${authorId}`);
+  }
+
   function handleOpenMedia(mediaEntry, mediaItem) {
     setActiveEntry(mediaEntry);
     setActiveMedia(mediaItem);
@@ -756,12 +787,19 @@ function MediaViewerModal({
           <div className="media-viewer-entry">
             <div className="media-viewer-entry-top">
               <div className="entry-card-header">
-                <Avatar user={shownEntry.author} />
+                <Avatar
+                  user={shownEntry.author}
+                  onClick={() => handleOpenAuthorProfile(shownEntry.author?.id)}
+                />
 
-                <div className="entry-author-line">
+                <button
+                  type="button"
+                  className="entry-author-line entry-author-button"
+                  onClick={() => handleOpenAuthorProfile(shownEntry.author?.id)}
+                >
                   <strong>{shownEntry.author?.full_name}</strong>
                   <span>@{shownEntry.author?.username}</span>
-                </div>
+                </button>
               </div>
 
               {canManageEntry && (
@@ -864,6 +902,7 @@ function MediaViewerModal({
                   commentItem={commentItem}
                   onOpenCommentDetail={handleOpenCommentDetail}
                   onOpenMedia={handleOpenMedia}
+                  onOpenAuthorProfile={handleOpenAuthorProfile}
                   onDeleted={handleCommentDeleted}
                   onUpdated={handleCommentUpdated}
                 />

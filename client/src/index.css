@@ -2624,3 +2624,19 @@ textarea {
 .media-viewer-comment-repost-wrapper .media-viewer-comment-action {
   width: 100%;
 }
+
+.avatar-button,
+.entry-author-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.entry-author-button:hover strong,
+.entry-author-button:hover span {
+  text-decoration: underline;
+}
