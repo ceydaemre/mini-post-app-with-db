@@ -2904,3 +2904,123 @@ textarea {
 .search-entry-list {
   margin-top: 0;
 }
+
+.search-input-wrapper {
+  position: relative;
+}
+
+.search-input-wrapper .search-input {
+  padding-right: 48px;
+}
+
+.search-clear-button {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  background: #e5e7eb;
+  color: #111827;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.search-clear-button:hover {
+  background: #d1d5db;
+}
+
+.search-skeleton-block,
+.search-skeleton-line {
+  position: relative;
+  overflow: hidden;
+  background: #e5e7eb;
+}
+
+.search-skeleton-block::after,
+.search-skeleton-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.65),
+    transparent
+  );
+  animation: search-skeleton-shimmer 1.2s infinite;
+}
+
+.search-user-skeleton {
+  cursor: default;
+}
+
+.search-user-skeleton:hover {
+  background: transparent;
+}
+
+.search-skeleton-line {
+  height: 12px;
+  border-radius: 999px;
+}
+
+.search-skeleton-line-name {
+  width: 140px;
+}
+
+.search-skeleton-line-username {
+  width: 90px;
+}
+
+.search-entry-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-entry-skeleton-card {
+  border: 1px solid #f1f5f9;
+  border-radius: 18px;
+  padding: 16px;
+  background: #ffffff;
+}
+
+.search-entry-skeleton-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.search-skeleton-line-content {
+  width: 100%;
+  height: 13px;
+  margin-top: 10px;
+}
+
+.search-skeleton-line-content.short {
+  width: 68%;
+}
+
+.search-empty-state p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+@keyframes search-skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.search-input::-webkit-search-cancel-button,
+.search-input::-webkit-search-decoration {
+  appearance: none;
+  -webkit-appearance: none;
+}

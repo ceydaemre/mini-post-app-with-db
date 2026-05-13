@@ -48,6 +48,45 @@ function SearchUserCard({ user }) {
   );
 }
 
+function SearchUserSkeletonList() {
+  return (
+    <section className="search-user-list">
+      {[1, 2, 3].map((item) => (
+        <div className="search-user-card search-user-skeleton" key={item}>
+          <div className="search-user-avatar search-skeleton-block" />
+
+          <div className="search-user-info">
+            <div className="search-skeleton-line search-skeleton-line-name" />
+            <div className="search-skeleton-line search-skeleton-line-username" />
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function SearchEntrySkeletonList() {
+  return (
+    <section className="search-entry-skeleton-list">
+      {[1, 2].map((item) => (
+        <div className="search-entry-skeleton-card" key={item}>
+          <div className="search-entry-skeleton-header">
+            <div className="search-user-avatar search-skeleton-block" />
+
+            <div className="search-user-info">
+              <div className="search-skeleton-line search-skeleton-line-name" />
+              <div className="search-skeleton-line search-skeleton-line-username" />
+            </div>
+          </div>
+
+          <div className="search-skeleton-line search-skeleton-line-content" />
+          <div className="search-skeleton-line search-skeleton-line-content short" />
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -141,6 +180,15 @@ function SearchPage() {
     updateSearchParams(nextValue, activeTab);
   }
 
+  function handleClearSearch() {
+    setSearchText("");
+    setItems([]);
+    setHasMore(false);
+    setNextOffset(0);
+    setError("");
+    updateSearchParams("", activeTab);
+  }
+
   function handleTabChange(tab) {
     if (tab === activeTab) return;
 
@@ -196,13 +244,26 @@ function SearchPage() {
       </section>
 
       <section className="search-page-shell">
-        <input
-          className="search-input"
-          type="search"
-          placeholder="Kullanıcı veya entry ara"
-          value={searchText}
-          onChange={handleInputChange}
-        />
+        <div className="search-input-wrapper">
+          <input
+            className="search-input"
+            type="search"
+            placeholder="Kullanıcı veya entry ara"
+            value={searchText}
+            onChange={handleInputChange}
+          />
+
+          {searchText && (
+            <button
+              type="button"
+              className="search-clear-button"
+              onClick={handleClearSearch}
+              aria-label="Aramayı temizle"
+            >
+              ×
+            </button>
+          )}
+        </div>
 
         <div className="search-tabs">
           <button
@@ -224,7 +285,8 @@ function SearchPage() {
 
         {!normalizedQuery && (
           <section className="empty-state search-empty-state">
-            <h3>Aramak için bir şeyler yaz.</h3>
+            <h3>Kullanıcı, entry veya konu ara.</h3>
+            <p>Aramaya başlamak için en az 2 karakter yaz.</p>
           </section>
         )}
 
@@ -236,15 +298,14 @@ function SearchPage() {
 
         {error && <div className="error-message">{error}</div>}
 
-        {loading && (
-          <section className="empty-state search-empty-state">
-            <h3>Aranıyor...</h3>
-          </section>
-        )}
+        {loading && activeTab === "users" && <SearchUserSkeletonList />}
+
+        {loading && activeTab === "entries" && <SearchEntrySkeletonList />}
 
         {!loading && canSearch && items.length === 0 && !error && (
           <section className="empty-state search-empty-state">
-            <h3>Sonuç bulunamadı.</h3>
+            <h3>"{normalizedQuery}" için sonuç bulunamadı.</h3>
+            <p>Farklı bir kelime veya kullanıcı adı dene.</p>
           </section>
         )}
 
