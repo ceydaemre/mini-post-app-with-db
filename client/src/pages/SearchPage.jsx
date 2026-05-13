@@ -9,6 +9,8 @@ const VALID_SEARCH_TABS = ["users", "entries"];
 const SEARCH_LIMIT = 10;
 const MIN_SEARCH_LENGTH = 2;
 const SEARCH_DEBOUNCE_MS = 400;
+const RECENT_SEARCHES_STORAGE_KEY = "mini_post_recent_searches";
+const RECENT_SEARCHES_LIMIT = 5;
 
 function getTabFromSearchParams(searchParams) {
   const tab = searchParams.get("tab");
@@ -18,6 +20,28 @@ function getTabFromSearchParams(searchParams) {
   }
 
   return "users";
+}
+
+function getRecentSearchesFromStorage() {
+  try {
+    const rawValue = localStorage.getItem(RECENT_SEARCHES_STORAGE_KEY);
+    const parsedValue = JSON.parse(rawValue);
+
+    return Array.isArray(parsedValue) ? parsedValue : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentSearchesToStorage(searches) {
+  localStorage.setItem(
+    RECENT_SEARCHES_STORAGE_KEY,
+    JSON.stringify(searches)
+  );
+}
+
+function normalizeRecentSearchQuery(query) {
+  return query.trim().replace(/\s+/g, " ");
 }
 
 function SearchUserCard({ user }) {
@@ -102,6 +126,9 @@ function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [recentSearches, setRecentSearches] = useState(() =>
+    getRecentSearchesFromStorage()
+  );
 
   const normalizedQuery = searchText.trim();
   const canSearch = normalizedQuery.length >= MIN_SEARCH_LENGTH;
@@ -116,6 +143,53 @@ function SearchPage() {
     params.set("tab", nextTab);
 
     setSearchParams(params, { replace: true });
+  }
+
+  function saveRecentSearch(query) {
+    const normalizedRecentQuery = normalizeRecentSearchQuery(query);
+
+    if (normalizedRecentQuery.length < MIN_SEARCH_LENGTH) return;
+
+    setRecentSearches((currentSearches) => {
+      const nextSearches = [
+        normalizedRecentQuery,
+        ...currentSearches.filter(
+          (item) =>
+            item.toLocaleLowerCase("tr-TR") !==
+            normalizedRecentQuery.toLocaleLowerCase("tr-TR")
+        ),
+      ].slice(0, RECENT_SEARCHES_LIMIT);
+
+      saveRecentSearchesToStorage(nextSearches);
+
+      return nextSearches;
+    });
+  }
+
+  function handleRecentSearchClick(query) {
+    setSearchText(query);
+    setItems([]);
+    setHasMore(false);
+    setNextOffset(0);
+    setError("");
+    updateSearchParams(query, activeTab);
+  }
+
+  function handleRemoveRecentSearch(event, query) {
+    event.stopPropagation();
+
+    setRecentSearches((currentSearches) => {
+      const nextSearches = currentSearches.filter((item) => item !== query);
+
+      saveRecentSearchesToStorage(nextSearches);
+
+      return nextSearches;
+    });
+  }
+
+  function handleClearRecentSearches() {
+    setRecentSearches([]);
+    saveRecentSearchesToStorage([]);
   }
 
   async function fetchSearchResults({
@@ -145,6 +219,10 @@ function SearchPage() {
         tab === "users"
           ? await searchUsers(requestPayload)
           : await searchEntries(requestPayload);
+
+      if (!append) {
+        saveRecentSearch(query);
+      }
 
       const rawItems = result?.data?.items || [];
       const nextItems = Array.isArray(rawItems) ? rawItems : [];
@@ -265,6 +343,46 @@ function SearchPage() {
           )}
         </div>
 
+        {!normalizedQuery && recentSearches.length > 0 && (
+          <section className="recent-searches-card">
+            <div className="recent-searches-header">
+              <h3>Son aramalar</h3>
+
+              <button type="button" onClick={handleClearRecentSearches}>
+                Tümünü temizle
+              </button>
+            </div>
+
+            <div className="recent-searches-list">
+              {recentSearches.map((query) => (
+                <button
+                  type="button"
+                  className="recent-search-item"
+                  key={query}
+                  onClick={() => handleRecentSearchClick(query)}
+                >
+                  <span>{query}</span>
+
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className="recent-search-remove"
+                    onClick={(event) => handleRemoveRecentSearch(event, query)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        handleRemoveRecentSearch(event, query);
+                      }
+                    }}
+                    aria-label={`${query} aramasını sil`}
+                  >
+                    ×
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         <div className="search-tabs">
           <button
             type="button"
@@ -284,10 +402,12 @@ function SearchPage() {
         </div>
 
         {!normalizedQuery && (
-          <section className="empty-state search-empty-state">
-            <h3>Kullanıcı, entry veya konu ara.</h3>
-            <p>Aramaya başlamak için en az 2 karakter yaz.</p>
-          </section>
+          <>
+            <section className="empty-state search-empty-state">
+              <h3>Kullanıcı, entry veya konu ara.</h3>
+              <p>Aramaya başlamak için en az 2 karakter yaz.</p>
+            </section>
+          </>
         )}
 
         {normalizedQuery && !canSearch && (
