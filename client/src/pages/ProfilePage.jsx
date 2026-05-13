@@ -4,12 +4,14 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import MainLayout from "../layouts/MainLayout.jsx";
 import EntryCard from "../components/EntryCard.jsx";
 import EditProfileModal from "../components/EditProfileModal.jsx";
+import DeleteEntryConfirmModal from "../components/DeleteEntryConfirmModal.jsx";
 import {
   getUserLikes,
   getUserMedia,
   getUserPosts,
   getUserProfile,
   getUserReplies,
+  toggleFollow,
 } from "../api/userApi.js";
 
 const VALID_TABS = ["posts", "replies", "likes", "media"];
@@ -62,6 +64,8 @@ function ProfilePage() {
 
   const [profileLoading, setProfileLoading] = useState(false);
   const [itemsLoading, setItemsLoading] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [unfollowModalOpen, setUnfollowModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [error, setError] = useState("");
 
@@ -207,6 +211,93 @@ function ProfilePage() {
     }
   }
 
+  async function applyFollowToggle(nextIsFollowing) {
+    if (followLoading || isMyProfile || !profileUser?.id) return false;
+
+    const previousProfileData = profileData;
+    const previousIsFollowing = Boolean(
+      previousProfileData?.viewer_state?.is_following
+    );
+    const previousFollowersCount =
+      previousProfileData?.stats?.followers_count || 0;
+
+    setFollowLoading(true);
+    setError("");
+
+    setProfileData((current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        stats: {
+          ...current.stats,
+          followers_count: Math.max(
+            0,
+            previousFollowersCount + (nextIsFollowing ? 1 : -1)
+          ),
+        },
+        viewer_state: {
+          ...current.viewer_state,
+          is_following: nextIsFollowing,
+        },
+      };
+    });
+
+    try {
+      const result = await toggleFollow(profileUser.id);
+      const isFollowingFromApi = Boolean(result?.data?.is_following);
+      const countDelta =
+        isFollowingFromApi === previousIsFollowing
+          ? 0
+          : isFollowingFromApi
+            ? 1
+            : -1;
+
+      setProfileData((current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          stats: {
+            ...current.stats,
+            followers_count: Math.max(0, previousFollowersCount + countDelta),
+          },
+          viewer_state: {
+            ...current.viewer_state,
+            is_following: isFollowingFromApi,
+          },
+        };
+      });
+
+      return true;
+    } catch (error) {
+      setProfileData(previousProfileData);
+      setError(error.message);
+      return false;
+    } finally {
+      setFollowLoading(false);
+    }
+  }
+
+  function handleToggleFollow() {
+    if (followLoading || isMyProfile || !profileUser?.id) return;
+
+    if (viewerState.is_following) {
+      setUnfollowModalOpen(true);
+      return;
+    }
+
+    applyFollowToggle(true);
+  }
+
+  async function handleConfirmUnfollow() {
+    const isSuccessful = await applyFollowToggle(false);
+
+    if (isSuccessful) {
+      setUnfollowModalOpen(false);
+    }
+  }
+
   useEffect(() => {
     const tabFromUrl = getTabFromSearchParams(searchParams);
     setActiveTab(tabFromUrl);
@@ -255,8 +346,16 @@ function ProfilePage() {
               )}
 
               {!isMyProfile && (
-                <button className="profile-action-button">
-                  {viewerState.is_following ? "Takip Ediliyor" : "Takip Et"}
+                <button
+                  className="profile-action-button"
+                  onClick={handleToggleFollow}
+                  disabled={followLoading}
+                >
+                  {followLoading
+                    ? "İşleniyor..."
+                    : viewerState.is_following
+                      ? "Takip Ediliyor"
+                      : "Takip Et"}
                 </button>
               )}
             </div>
@@ -356,6 +455,18 @@ function ProfilePage() {
               profileUser={profileUser}
               onClose={() => setEditModalOpen(false)}
               onUpdated={handleProfileUpdated}
+            />
+          )}
+
+          {unfollowModalOpen && (
+            <DeleteEntryConfirmModal
+              deleting={followLoading}
+              title="Takipten çıkılsın mı?"
+              description="Bu kullanıcıyı takipten çıkmak istediğine emin misin?"
+              confirmText="Takipten çık"
+              loadingText="Çıkılıyor..."
+              onCancel={() => setUnfollowModalOpen(false)}
+              onConfirm={handleConfirmUnfollow}
             />
           )}
         </>

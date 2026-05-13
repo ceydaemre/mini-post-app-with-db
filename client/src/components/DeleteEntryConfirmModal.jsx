@@ -1,13 +1,21 @@
-function DeleteEntryConfirmModal({ onCancel, onConfirm, deleting }) {
+function DeleteEntryConfirmModal({
+  onCancel,
+  onConfirm,
+  deleting,
+  title = "Entry silinsin mi?",
+  description = "Entry'i silmek istediğine emin misin?",
+  confirmText = "Entry’i sil",
+  loadingText = "Siliniyor...",
+}) {
   return (
     <div className="confirm-modal-backdrop" onClick={onCancel}>
       <section
         className="confirm-modal"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2>Entry silinsin mi?</h2>
+        <h2>{title}</h2>
 
-        <p>Entry'i silmek istediğine emin misin?</p>
+        <p>{description}</p>
 
         <div className="confirm-modal-actions">
           <button
@@ -25,7 +33,7 @@ function DeleteEntryConfirmModal({ onCancel, onConfirm, deleting }) {
             onClick={onConfirm}
             disabled={deleting}
           >
-            {deleting ? "Siliniyor..." : "Entry’i sil"}
+            {deleting ? loadingText : confirmText}
           </button>
         </div>
       </section>

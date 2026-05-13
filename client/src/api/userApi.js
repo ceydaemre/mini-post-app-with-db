@@ -21,6 +21,12 @@ export function updateMyProfile({
   });
 }
 
+export function toggleFollow(userId) {
+  return apiRequest(`/api/users/${userId}/follow`, {
+    method: "POST",
+  });
+}
+
 function buildPaginationQuery({ limit = 10, offset = 0 } = {}) {
   const params = new URLSearchParams();
 
