@@ -76,6 +76,34 @@ function isUpdated(entry) {
   return updatedTime > createdTime + 1000;
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function HighlightedEntryText({ text, query }) {
+  if (!text) return null;
+
+  const normalizedQuery = query?.trim();
+
+  if (!normalizedQuery || normalizedQuery.length < 2) {
+    return text;
+  }
+
+  const regex = new RegExp(`(${escapeRegExp(normalizedQuery)})`, "gi");
+  const parts = String(text).split(regex);
+
+  return parts.map((part, index) =>
+    part.toLocaleLowerCase("tr-TR") ===
+    normalizedQuery.toLocaleLowerCase("tr-TR") ? (
+      <mark className="search-highlight" key={`${part}-${index}`}>
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
 function Avatar({ user, onClick }) {
   const content = user?.profile_image_url ? (
     <img src={user.profile_image_url} alt={user.full_name || "avatar"} />
@@ -162,6 +190,7 @@ function EntryCard({
   onEntryCreated,
   onEntryDeleted,
   onEntryUpdated,
+  highlightQuery = "",
 }) {
   const navigate = useNavigate();
 
@@ -428,7 +457,11 @@ function EntryCard({
 
         {(entry.is_deleted || entry.content) && (
           <p className="entry-content">
-            {entry.is_deleted ? "Bu gönderi silinmiş." : entry.content}
+            {entry.is_deleted ? (
+              "Bu gönderi silinmiş."
+            ) : (
+              <HighlightedEntryText text={entry.content} query={highlightQuery} />
+            )}
           </p>
         )}
 

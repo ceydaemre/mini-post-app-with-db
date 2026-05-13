@@ -3143,3 +3143,10 @@ textarea {
   opacity: 0.65;
   cursor: not-allowed;
 }
+
+.search-highlight {
+  border-radius: 4px;
+  padding: 0 2px;
+  background: #fef3c7;
+  color: inherit;
+}

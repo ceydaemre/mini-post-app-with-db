@@ -46,7 +46,35 @@ function normalizeRecentSearchQuery(query) {
   return query.trim().replace(/\s+/g, " ");
 }
 
-function SearchUserCard({ user, followLoading, onFollowClick }) {
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function HighlightText({ text, query }) {
+  if (!text) return null;
+
+  const normalizedQuery = query.trim();
+
+  if (normalizedQuery.length < MIN_SEARCH_LENGTH) {
+    return text;
+  }
+
+  const regex = new RegExp(`(${escapeRegExp(normalizedQuery)})`, "gi");
+  const parts = String(text).split(regex);
+
+  return parts.map((part, index) =>
+    part.toLocaleLowerCase("tr-TR") ===
+    normalizedQuery.toLocaleLowerCase("tr-TR") ? (
+      <mark className="search-highlight" key={`${part}-${index}`}>
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
+function SearchUserCard({ user, highlightQuery, followLoading, onFollowClick }) {
   const navigate = useNavigate();
 
   function handleClick() {
@@ -77,8 +105,12 @@ function SearchUserCard({ user, followLoading, onFollowClick }) {
       </div>
 
       <div className="search-user-info">
-        <strong>{user.full_name}</strong>
-        <span>@{user.username}</span>
+        <strong>
+          <HighlightText text={user.full_name} query={highlightQuery} />
+        </strong>
+        <span>
+          @<HighlightText text={user.username} query={highlightQuery} />
+        </span>
 
         {user.is_me && <small>Sen</small>}
       </div>
@@ -530,6 +562,7 @@ function SearchPage() {
               <SearchUserCard
                 key={user.id}
                 user={user}
+                highlightQuery={normalizedQuery}
                 followLoading={
                   Number(searchFollowLoadingUserId) === Number(user.id)
                 }
@@ -545,6 +578,7 @@ function SearchPage() {
               <EntryCard
                 key={`${item.entry_type}-${item.entry.id}`}
                 item={item}
+                highlightQuery={normalizedQuery}
               />
             ))}
           </section>
