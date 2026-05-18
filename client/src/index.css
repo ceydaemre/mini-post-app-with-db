@@ -3306,3 +3306,42 @@ textarea {
   font-weight: 900;
   line-height: 1;
 }
+
+.notification-avatar-wrapper {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.notification-type-icon {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #64748b;
+  color: #ffffff;
+}
+
+.notification-type-icon.follow {
+  background: #2563eb;
+}
+
+.notification-type-icon.like {
+  background: #ef4444;
+}
+
+.notification-type-icon.comment {
+  background: #0f172a;
+}
+
+.notification-type-icon.repost {
+  background: #16a34a;
+}
+
+.notification-type-icon.quote {
+  background: #7c3aed;
+}

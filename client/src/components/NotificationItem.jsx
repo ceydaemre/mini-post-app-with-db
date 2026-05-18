@@ -1,4 +1,11 @@
 import { useNavigate } from "react-router-dom";
+import {
+  Heart,
+  MessageCircle,
+  PenLine,
+  Repeat2,
+  UserPlus,
+} from "lucide-react";
 
 function formatNotificationDate(createdAt) {
   if (!createdAt) return "";
@@ -20,6 +27,22 @@ function getNotificationMessage(type) {
   if (type === "QUOTE") return "entry’ni quote’ladı.";
 
   return "sana bildirim gönderdi.";
+}
+
+function NotificationTypeIcon({ type }) {
+  let Icon = MessageCircle;
+
+  if (type === "FOLLOW") Icon = UserPlus;
+  if (type === "LIKE") Icon = Heart;
+  if (type === "COMMENT") Icon = MessageCircle;
+  if (type === "REPOST") Icon = Repeat2;
+  if (type === "QUOTE") Icon = PenLine;
+
+  return (
+    <span className={`notification-type-icon ${type.toLowerCase()}`}>
+      <Icon size={13} strokeWidth={2.6} />
+    </span>
+  );
 }
 
 function NotificationAvatar({ actor }) {
@@ -69,7 +92,10 @@ function NotificationItem({ notification, onRead }) {
         }
       }}
     >
-      <NotificationAvatar actor={actor} />
+      <div className="notification-avatar-wrapper">
+        <NotificationAvatar actor={actor} />
+        <NotificationTypeIcon type={notification.type} />
+      </div>
 
       <div className="notification-content">
         <p className="notification-message">
