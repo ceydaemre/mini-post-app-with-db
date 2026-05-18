@@ -6,6 +6,7 @@ import postitLogo from "../assets/postit-logo.png";
 import {
   getConversationMessages,
   getConversations,
+  getUnreadMessagesCount,
   markConversationMessagesAsRead,
   sendMessage,
 } from "../api/messageApi.js";
@@ -65,8 +66,20 @@ function MessagesDock() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   const shouldHideDock = location.pathname.startsWith("/messages");
+
+  async function fetchUnreadMessagesCount() {
+    if (!currentUser?.id) return;
+
+    try {
+      const result = await getUnreadMessagesCount();
+      setUnreadMessagesCount(result?.data?.unread_count || 0);
+    } catch {
+      setUnreadMessagesCount(0);
+    }
+  }
 
   async function fetchConversations() {
     setLoadingConversations(true);
@@ -112,6 +125,7 @@ function MessagesDock() {
       setMessages(nextMessages);
 
       await markConversationMessagesAsRead(conversation.conversation_id);
+      fetchUnreadMessagesCount();
 
       setConversations((currentItems) =>
         currentItems.map((item) =>
@@ -196,6 +210,7 @@ function MessagesDock() {
 
       setMessageText("");
       await fetchConversations();
+      fetchUnreadMessagesCount();
 
       if (draftUser && conversationId) {
         const newConversation = {
@@ -237,6 +252,15 @@ function MessagesDock() {
       fetchConversations();
     }
   }, [open]);
+
+  useEffect(() => {
+    if (shouldHideDock) {
+      setUnreadMessagesCount(0);
+      return;
+    }
+
+    fetchUnreadMessagesCount();
+  }, [shouldHideDock, currentUser?.id]);
 
   useEffect(() => {
     if (!open || mode !== "new") return;
@@ -497,7 +521,15 @@ function MessagesDock() {
         onClick={() => setOpen((current) => !current)}
         aria-label="Mesajları aç"
       >
-        <img src={postitLogo} alt="Messages" />
+        <span className="messages-dock-launcher-logo">
+          <img src={postitLogo} alt="Messages" />
+        </span>
+
+        {unreadMessagesCount > 0 && (
+          <span className="messages-dock-launcher-badge">
+            {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
+          </span>
+        )}
       </button>
     </div>
   );
