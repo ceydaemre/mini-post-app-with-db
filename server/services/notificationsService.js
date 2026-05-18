@@ -83,10 +83,14 @@ async function getNotificationsService(user_id, limit = 10, offset = 0) {
             actor.id AS actor_id,
             actor.full_name AS actor_full_name,
             actor.username AS actor_username,
-            actor.profile_image_url AS actor_profile_image_url
+            actor.profile_image_url AS actor_profile_image_url,
+            e.content AS entry_content,
+            e.is_deleted AS entry_is_deleted
         FROM notifications n
         INNER JOIN users actor
             ON n.actor_user_id = actor.id
+        LEFT JOIN entries e
+            ON n.entry_id = e.id
         WHERE n.receiver_user_id = $1
         ORDER BY n.created_at DESC, n.id DESC
         LIMIT $2
@@ -115,7 +119,18 @@ async function getNotificationsService(user_id, limit = 10, offset = 0) {
                 full_name: notification.actor_full_name,
                 username: notification.actor_username,
                 profile_image_url: notification.actor_profile_image_url
-            }
+            },
+            entry: notification.entry_id
+                ? {
+                    id: notification.entry_id,
+                    content_preview: notification.entry_is_deleted
+                        ? "Bu gönderi silinmiş."
+                        : notification.entry_content
+                            ? notification.entry_content.slice(0, 120)
+                            : null,
+                    is_deleted: notification.entry_is_deleted
+                }
+                : null
         };
     });
 

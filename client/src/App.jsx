@@ -9,6 +9,7 @@ import HomePage from "./pages/HomePage.jsx";
 import EntryDetailPage from "./pages/EntryDetailPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import SearchPage from "./pages/SearchPage.jsx";
+import NotificationsPage from "./pages/NotificationsPage.jsx";
 
 function App() {
   return (
@@ -47,6 +48,15 @@ function App() {
         element={
           <ProtectedRoute>
             <SearchPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <NotificationsPage />
           </ProtectedRoute>
         }
       />
