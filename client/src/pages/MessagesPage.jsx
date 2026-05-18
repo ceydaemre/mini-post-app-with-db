@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Plus, Search, X } from "lucide-react";
 
 import MainLayout from "../layouts/MainLayout.jsx";
 import {
@@ -8,6 +9,7 @@ import {
   markConversationMessagesAsRead,
   sendMessage,
 } from "../api/messageApi.js";
+import { searchUsers } from "../api/searchApi.js";
 import { getUserProfile } from "../api/userApi.js";
 
 const CONVERSATIONS_LIMIT = 10;
@@ -153,6 +155,10 @@ function MessagesPage() {
   const [sending, setSending] = useState(false);
 
   const [messageText, setMessageText] = useState("");
+  const [newMessageSearchOpen, setNewMessageSearchOpen] = useState(false);
+  const [newMessageSearchText, setNewMessageSearchText] = useState("");
+  const [newMessageSearchResults, setNewMessageSearchResults] = useState([]);
+  const [newMessageSearchLoading, setNewMessageSearchLoading] = useState(false);
   const [error, setError] = useState("");
 
   const selectedConversationId = conversationId ? Number(conversationId) : null;
@@ -308,6 +314,35 @@ function MessagesPage() {
     });
   }
 
+  function handleOpenNewMessageSearch() {
+    setNewMessageSearchOpen(true);
+    setNewMessageSearchText("");
+    setNewMessageSearchResults([]);
+    setError("");
+  }
+
+  function handleCloseNewMessageSearch() {
+    setNewMessageSearchOpen(false);
+    setNewMessageSearchText("");
+    setNewMessageSearchResults([]);
+  }
+
+  function handleSelectNewMessageUser(user) {
+    const existingConversation = conversations.find(
+      (conversation) =>
+        Number(conversation.other_user?.id) === Number(user?.id)
+    );
+
+    handleCloseNewMessageSearch();
+
+    if (existingConversation) {
+      navigate(`/messages/${existingConversation.conversation_id}`);
+      return;
+    }
+
+    navigate(`/messages/new/${user.id}`);
+  }
+
   function handleLoadMoreMessages() {
     if (messagesLoading || messagesLoadingMore || !messagesHasMore) return;
 
@@ -360,6 +395,59 @@ function MessagesPage() {
   }, []);
 
   useEffect(() => {
+    if (!newMessageSearchOpen) return;
+
+    const normalizedQuery = newMessageSearchText.trim().replace(/^@+/, "");
+
+    if (normalizedQuery.length < 2) {
+      setNewMessageSearchResults([]);
+      setNewMessageSearchLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    async function fetchUsers() {
+      setNewMessageSearchLoading(true);
+
+      try {
+        const result = await searchUsers({
+          query: normalizedQuery,
+          limit: 6,
+          offset: 0,
+        });
+
+        const users = Array.isArray(result?.data?.items)
+          ? result.data.items
+          : Array.isArray(result?.data?.users)
+            ? result.data.users
+            : Array.isArray(result?.data)
+              ? result.data
+              : [];
+
+        if (!isMounted) return;
+
+        setNewMessageSearchResults(users.filter((user) => !user.is_me));
+      } catch {
+        if (!isMounted) return;
+
+        setNewMessageSearchResults([]);
+      } finally {
+        if (isMounted) {
+          setNewMessageSearchLoading(false);
+        }
+      }
+    }
+
+    const timeoutId = setTimeout(fetchUsers, 350);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [newMessageSearchText, newMessageSearchOpen]);
+
+  useEffect(() => {
     setMessages([]);
     setConversationDetail(null);
     setDraftUser(null);
@@ -391,9 +479,78 @@ function MessagesPage() {
 
       <section className="messages-layout">
         <aside className="conversations-panel">
-          <div className="messages-panel-header">
+          <div className="messages-panel-header messages-panel-header-with-action">
             <h3>Konuşmalar</h3>
+
+            <button
+              type="button"
+              className="messages-new-chat-button"
+              onClick={newMessageSearchOpen ? handleCloseNewMessageSearch : handleOpenNewMessageSearch}
+              aria-label={newMessageSearchOpen ? "Yeni sohbet aramasını kapat" : "Yeni sohbet başlat"}
+            >
+              {newMessageSearchOpen ? <X size={17} /> : <Plus size={17} />}
+            </button>
           </div>
+
+          {newMessageSearchOpen && (
+            <section className="messages-new-chat-panel">
+              <div className="messages-new-chat-search">
+                <Search size={16} />
+
+                <input
+                  value={newMessageSearchText}
+                  onChange={(event) => setNewMessageSearchText(event.target.value)}
+                  placeholder="Kullanıcı adı veya isim ara..."
+                  autoFocus
+                />
+              </div>
+
+              {newMessageSearchText.trim().length < 2 && (
+                <p className="messages-new-chat-hint">
+                  Yeni sohbet başlatmak için en az 2 karakter yaz.
+                </p>
+              )}
+
+              {newMessageSearchLoading && (
+                <p className="messages-new-chat-hint">Kullanıcılar aranıyor...</p>
+              )}
+
+              {!newMessageSearchLoading &&
+                newMessageSearchText.trim().length >= 2 &&
+                newMessageSearchResults.length === 0 && (
+                  <p className="messages-new-chat-hint">Kullanıcı bulunamadı.</p>
+                )}
+
+              {newMessageSearchResults.length > 0 && (
+                <div className="messages-new-chat-results">
+                  {newMessageSearchResults.map((user) => {
+                    const existingConversation = conversations.find(
+                      (conversation) =>
+                        Number(conversation.other_user?.id) === Number(user.id)
+                    );
+
+                    return (
+                      <button
+                        type="button"
+                        className="messages-new-chat-result"
+                        key={user.id}
+                        onClick={() => handleSelectNewMessageUser(user)}
+                      >
+                        <UserAvatar user={user} />
+
+                        <span>
+                          <strong>{user.full_name}</strong>
+                          <small>@{user.username}</small>
+                        </span>
+
+                        {existingConversation && <em>Mevcut sohbet</em>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
 
           {conversationLoading && conversations.length === 0 && (
             <section className="empty-state messages-empty-state">
