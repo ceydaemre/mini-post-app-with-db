@@ -4361,3 +4361,17 @@ textarea {
 .message-profile-username-button:hover {
   text-decoration: underline;
 }
+
+.sidebar-nav a.active-sidebar-link {
+  background: #111827;
+  color: #ffffff;
+}
+
+.sidebar-nav a.active-sidebar-link:hover {
+  background: #111827;
+  color: #ffffff;
+}
+
+.sidebar-nav a.active-sidebar-link .sidebar-notification-badge {
+  border: 1px solid #ffffff;
+}

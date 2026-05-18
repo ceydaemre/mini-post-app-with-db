@@ -19,6 +19,14 @@ function MainLayout({ children }) {
     navigate("/login");
   }
 
+  function getNavLinkClass(path) {
+    return location.pathname === path ? "active-sidebar-link" : "";
+  }
+
+  function getSectionNavLinkClass(pathPrefix) {
+    return location.pathname.startsWith(pathPrefix) ? "active-sidebar-link" : "";
+  }
+
   useEffect(() => {
     let isMounted = true;
 
@@ -92,9 +100,12 @@ function MainLayout({ children }) {
           </Link>
 
           <nav className="sidebar-nav">
-            <Link to="/home">Home</Link>
-            <Link to="/search">Search</Link>
-            <Link to="/notifications" className="sidebar-nav-notification-link">
+            <Link to="/home" className={getNavLinkClass("/home")}>Home</Link>
+            <Link to="/search" className={getNavLinkClass("/search")}>Search</Link>
+            <Link
+              to="/notifications"
+              className={`sidebar-nav-notification-link ${getSectionNavLinkClass("/notifications")}`}
+            >
               <span>Notifications</span>
 
               {unreadNotificationsCount > 0 && (
@@ -105,7 +116,10 @@ function MainLayout({ children }) {
                 </span>
               )}
             </Link>
-            <Link to="/messages" className="sidebar-nav-notification-link">
+            <Link
+              to="/messages"
+              className={`sidebar-nav-notification-link ${getSectionNavLinkClass("/messages")}`}
+            >
               <span>Messages</span>
 
               {unreadMessagesCount > 0 && (
@@ -114,7 +128,14 @@ function MainLayout({ children }) {
                 </span>
               )}
             </Link>
-            {user && <Link to={`/users/${user.id}`}>Profile</Link>}
+            {user && (
+              <Link
+                to={`/users/${user.id}`}
+                className={getSectionNavLinkClass("/users")}
+              >
+                Profile
+              </Link>
+            )}
           </nav>
         </div>
 
