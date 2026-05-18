@@ -4282,3 +4282,18 @@ textarea {
   font-style: normal;
   font-weight: 800;
 }
+
+.notification-actor-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.notification-actor-text-button {
+  cursor: pointer;
+}
+
+.notification-actor-text-button:hover {
+  text-decoration: underline;
+}

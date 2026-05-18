@@ -62,10 +62,14 @@ function NotificationItem({ notification, onRead }) {
   const actor = notification.actor;
   const dateText = formatNotificationDate(notification.created_at);
 
-  function handleClick() {
+  function markAsReadIfNeeded() {
     if (!notification.is_read && onRead) {
       onRead(notification.id);
     }
+  }
+
+  function handleClick() {
+    markAsReadIfNeeded();
 
     if (notification.type === "FOLLOW" && actor?.id) {
       navigate(`/users/${actor.id}`);
@@ -74,6 +78,22 @@ function NotificationItem({ notification, onRead }) {
 
     if (notification.entry_id) {
       navigate(`/entries/${notification.entry_id}`);
+    }
+  }
+
+  function handleActorClick(event) {
+    event.stopPropagation();
+    markAsReadIfNeeded();
+
+    if (actor?.id) {
+      navigate(`/users/${actor.id}`);
+    }
+  }
+
+  function handleActorKeyDown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleActorClick(event);
     }
   }
 
@@ -92,19 +112,40 @@ function NotificationItem({ notification, onRead }) {
         }
       }}
     >
-      <div className="notification-avatar-wrapper">
+      <button
+        type="button"
+        className="notification-avatar-wrapper notification-actor-button"
+        onClick={handleActorClick}
+        aria-label={actor?.username ? `${actor.username} profiline git` : "Profile git"}
+      >
         <NotificationAvatar actor={actor} />
         <NotificationTypeIcon type={notification.type} />
-      </div>
+      </button>
 
       <div className="notification-content">
         <p className="notification-message">
-          <strong>{actor?.full_name}</strong>{" "}
+          <strong
+            role="button"
+            tabIndex={0}
+            className="notification-actor-text-button"
+            onClick={handleActorClick}
+            onKeyDown={handleActorKeyDown}
+          >
+            {actor?.full_name}
+          </strong>{" "}
           <span>{getNotificationMessage(notification.type)}</span>
         </p>
 
         {actor?.username && (
-          <p className="notification-username">@{actor.username}</p>
+          <p
+            role="button"
+            tabIndex={0}
+            className="notification-username notification-actor-text-button"
+            onClick={handleActorClick}
+            onKeyDown={handleActorKeyDown}
+          >
+            @{actor.username}
+          </p>
         )}
 
         {notification.entry?.content_preview && (
