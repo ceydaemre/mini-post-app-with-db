@@ -10,6 +10,7 @@ import EntryDetailPage from "./pages/EntryDetailPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import SearchPage from "./pages/SearchPage.jsx";
 import NotificationsPage from "./pages/NotificationsPage.jsx";
+import MessagesPage from "./pages/MessagesPage.jsx";
 
 function App() {
   return (
@@ -57,6 +58,33 @@ function App() {
         element={
           <ProtectedRoute>
             <NotificationsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/messages"
+        element={
+          <ProtectedRoute>
+            <MessagesPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/messages/new/:userId"
+        element={
+          <ProtectedRoute>
+            <MessagesPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/messages/:conversationId"
+        element={
+          <ProtectedRoute>
+            <MessagesPage />
           </ProtectedRoute>
         }
       />

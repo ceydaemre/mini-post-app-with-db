@@ -21,6 +21,7 @@ import {
   toggleEntryRepost,
 } from "../api/entryApi.js";
 import { uploadMediaFile } from "../api/uploadApi.js";
+import { getUserProfile } from "../api/userApi.js";
 
 function getCurrentUser() {
   try {
@@ -573,6 +574,7 @@ function MediaViewerModal({
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
 
+  const [hydratedCurrentUser, setHydratedCurrentUser] = useState(currentUser);
   const [activeEntry, setActiveEntry] = useState(entry);
   const [activeMedia, setActiveMedia] = useState(media);
   const [detail, setDetail] = useState(null);
@@ -756,6 +758,36 @@ function MediaViewerModal({
   }, [entry?.id, media?.id, media?.media_url]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    async function fetchCurrentUserProfile() {
+      if (!currentUser?.id) return;
+
+      try {
+        const result = await getUserProfile(currentUser.id);
+        const profileUser = result?.data?.profile_user;
+
+        if (!isMounted || !profileUser) return;
+
+        setHydratedCurrentUser((existingUser) => ({
+          ...existingUser,
+          ...profileUser,
+        }));
+      } catch {
+        if (!isMounted) return;
+
+        setHydratedCurrentUser(currentUser);
+      }
+    }
+
+    fetchCurrentUserProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.id]);
+
+  useEffect(() => {
     fetchDetail();
   }, [activeEntry?.id]);
 
@@ -856,7 +888,7 @@ function MediaViewerModal({
           </div>
 
           <form className="media-viewer-reply-box" onSubmit={handleCreateComment}>
-            <Avatar user={currentUser} />
+            <Avatar user={hydratedCurrentUser || currentUser} />
 
             <div className="media-viewer-reply-main">
               <input
