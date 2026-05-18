@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, Search, X } from "lucide-react";
 
@@ -52,65 +52,59 @@ function ConversationItem({ conversation, active, onClick, onProfileClick }) {
   const preview = lastMessage?.content || "Henüz mesaj yok.";
   const dateText = formatMessageDate(conversation.updated_at);
 
+  function handleRowKeyDown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onClick();
+    }
+  }
+
   function handleProfileClick(event) {
     event.stopPropagation();
-    onProfileClick(otherUser?.id);
+
+    if (otherUser?.id) {
+      onProfileClick(otherUser.id);
+    }
   }
 
   return (
-    <button
-      type="button"
+    <article
       className={`conversation-item ${active ? "active-conversation-item" : ""}`}
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={handleRowKeyDown}
     >
-      <span
-        role="button"
-        tabIndex={0}
-        className="message-profile-link"
+      <button
+        type="button"
+        className="message-profile-button"
         onClick={handleProfileClick}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            handleProfileClick(event);
-          }
-        }}
+        aria-label={otherUser?.username ? `${otherUser.username} profiline git` : "Profile git"}
       >
         <UserAvatar user={otherUser} />
-      </span>
+      </button>
 
       <div className="conversation-item-content">
         <div className="conversation-item-top">
-          <strong
-            role="button"
-            tabIndex={0}
-            className="message-profile-text-link"
+          <button
+            type="button"
+            className="message-profile-text-button"
             onClick={handleProfileClick}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                handleProfileClick(event);
-              }
-            }}
           >
             {otherUser?.full_name}
-          </strong>
+          </button>
+
           {dateText && <span>{dateText}</span>}
         </div>
 
-        <p
-          role="button"
-          tabIndex={0}
-          className="message-profile-text-link"
+        <button
+          type="button"
+          className="message-profile-username-button"
           onClick={handleProfileClick}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              handleProfileClick(event);
-            }
-          }}
         >
           @{otherUser?.username}
-        </p>
+        </button>
+
         <small>{preview}</small>
       </div>
 
@@ -119,7 +113,7 @@ function ConversationItem({ conversation, active, onClick, onProfileClick }) {
           {conversation.unread_count > 99 ? "99+" : conversation.unread_count}
         </span>
       )}
-    </button>
+    </article>
   );
 }
 
@@ -155,6 +149,7 @@ function MessagesPage() {
   const [sending, setSending] = useState(false);
 
   const [messageText, setMessageText] = useState("");
+  const messagesThreadRef = useRef(null);
   const [newMessageSearchOpen, setNewMessageSearchOpen] = useState(false);
   const [newMessageSearchText, setNewMessageSearchText] = useState("");
   const [newMessageSearchResults, setNewMessageSearchResults] = useState([]);
@@ -464,6 +459,12 @@ function MessagesPage() {
     }
   }, [selectedConversationId, draftReceiverId]);
 
+  useEffect(() => {
+    if (!messagesThreadRef.current) return;
+
+    messagesThreadRef.current.scrollTop = messagesThreadRef.current.scrollHeight;
+  }, [messages.length, selectedConversationId, draftReceiverId]);
+
   const otherUser =
     draftUser ||
     conversationDetail?.other_user ||
@@ -656,7 +657,7 @@ function MessagesPage() {
               )}
 
               {messages.length > 0 && (
-                <div className="messages-thread">
+                <div className="messages-thread" ref={messagesThreadRef}>
                   {messages
                     .slice()
                     .reverse()

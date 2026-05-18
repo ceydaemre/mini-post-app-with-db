@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, MessageCircle, Plus, Search, X } from "lucide-react";
 
@@ -58,6 +58,7 @@ function MessagesDock() {
   const [messages, setMessages] = useState([]);
 
   const [messageText, setMessageText] = useState("");
+  const dockThreadRef = useRef(null);
   const [searchText, setSearchText] = useState("");
   const [searchResults, setSearchResults] = useState([]);
 
@@ -314,6 +315,12 @@ function MessagesDock() {
     };
   }, [searchText, open, mode]);
 
+  useEffect(() => {
+    if (!dockThreadRef.current) return;
+
+    dockThreadRef.current.scrollTop = dockThreadRef.current.scrollHeight;
+  }, [messages.length, mode, selectedConversation?.conversation_id, draftUser?.id]);
+
   if (shouldHideDock) return null;
 
   const activeUser =
@@ -456,7 +463,7 @@ function MessagesDock() {
 
           {mode === "detail" && (
             <>
-              <div className="messages-dock-thread">
+              <div className="messages-dock-thread" ref={dockThreadRef}>
                 {loadingMessages && (
                   <p className="messages-dock-empty">Mesajlar yükleniyor...</p>
                 )}

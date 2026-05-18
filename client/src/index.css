@@ -4297,3 +4297,67 @@ textarea {
 .notification-actor-text-button:hover {
   text-decoration: underline;
 }
+
+.active-conversation-item {
+  position: relative;
+  background: #f1f5f9;
+}
+
+.active-conversation-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 4px;
+  border-radius: 999px;
+  background: #111827;
+}
+
+.active-conversation-item:hover {
+  background: #eef2f7;
+}
+
+.messages-thread,
+.messages-dock-thread {
+  scroll-behavior: smooth;
+}
+
+.message-profile-button,
+.message-profile-text-button,
+.message-profile-username-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.message-profile-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.message-profile-text-button {
+  min-width: 0;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-profile-username-button {
+  width: fit-content;
+  margin: 2px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  text-align: left;
+}
+
+.message-profile-text-button:hover,
+.message-profile-username-button:hover {
+  text-decoration: underline;
+}
