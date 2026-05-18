@@ -131,7 +131,7 @@ async function getUserProfileService(profile_user_id, current_user_id = null) {
         SELECT COUNT(*) AS count
         FROM entries
         WHERE user_id = $1
-          AND type IN ('POST', 'COMMENT', 'REPOST', 'QUOTE')
+          AND type IN ('POST', 'REPOST', 'QUOTE')
           AND is_deleted = false
     `;
 
@@ -236,7 +236,7 @@ async function getUserPostsService(profile_user_id, current_user_id = null, limi
         SELECT *
         FROM entries
         WHERE user_id = $1
-          AND type IN ('POST', 'COMMENT', 'REPOST', 'QUOTE')
+          AND type IN ('POST', 'REPOST', 'QUOTE')
           AND is_deleted = false
         ORDER BY created_at DESC
         LIMIT $2
