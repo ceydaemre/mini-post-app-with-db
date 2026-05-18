@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { registerUser } from "../api/authApi";
+import postitLogo from "../assets/postit-logo.png";
 
 function RegisterPage() {
   const navigate = useNavigate();
@@ -38,7 +39,7 @@ function RegisterPage() {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <h1>Postit.</h1>
+        <img className="auth-logo" src={postitLogo} alt="post!t" />
         <h2>Kaydol</h2>
 
         {error && <div className="error-message">{error}</div>}

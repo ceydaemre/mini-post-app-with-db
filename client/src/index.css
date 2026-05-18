@@ -4375,3 +4375,11 @@ textarea {
 .sidebar-nav a.active-sidebar-link .sidebar-notification-badge {
   border: 1px solid #ffffff;
 }
+
+.auth-logo {
+  width: 132px;
+  height: auto;
+  display: block;
+  margin: 0 0 10px;
+  object-fit: contain;
+}
