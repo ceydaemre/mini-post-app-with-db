@@ -5,7 +5,6 @@ import MainLayout from "../layouts/MainLayout.jsx";
 import EntryCard from "../components/EntryCard.jsx";
 import EditProfileModal from "../components/EditProfileModal.jsx";
 import DeleteEntryConfirmModal from "../components/DeleteEntryConfirmModal.jsx";
-import { sendMessage } from "../api/messageApi.js";
 import UserListModal from "../components/UserListModal.jsx";
 import {
   getUserFollowers,
@@ -70,9 +69,6 @@ function ProfilePage() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
-  const [messageModalOpen, setMessageModalOpen] = useState(false);
-  const [messageText, setMessageText] = useState("");
-  const [messageSending, setMessageSending] = useState(false);
   const [unfollowModalOpen, setUnfollowModalOpen] = useState(false);
   const [userListModalType, setUserListModalType] = useState(null);
   const [userListItems, setUserListItems] = useState([]);
@@ -313,46 +309,14 @@ function ProfilePage() {
     }
   }
 
-  function handleOpenMessageModal() {
-    setMessageText("");
-    setMessageModalOpen(true);
+  function handleOpenMessagePage() {
+    if (!profileUser?.id) return;
+
+    navigate(`/messages/new/${profileUser.id}`);
   }
 
-  function handleCloseMessageModal() {
-    if (messageSending) return;
 
-    setMessageText("");
-    setMessageModalOpen(false);
-  }
 
-  async function handleSendProfileMessage(event) {
-    event.preventDefault();
-
-    const normalizedMessage = messageText.trim();
-
-    if (!normalizedMessage || !profileUser?.id || messageSending) return;
-
-    setMessageSending(true);
-    setError("");
-
-    try {
-      const result = await sendMessage(profileUser.id, normalizedMessage);
-      const conversationId = result?.data?.conversation?.id;
-
-      setMessageText("");
-      setMessageModalOpen(false);
-
-      if (conversationId) {
-        navigate(`/messages/${conversationId}`);
-      } else {
-        navigate("/messages");
-      }
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setMessageSending(false);
-    }
-  }
 
   async function fetchUserList(type, { offset = 0, append = false } = {}) {
     if (!profileUser?.id) return;
@@ -496,7 +460,7 @@ function ProfilePage() {
                   <button
                     type="button"
                     className="profile-action-button profile-message-button"
-                    onClick={handleOpenMessageModal}
+                    onClick={handleOpenMessagePage}
                   >
                     Message
                   </button>
@@ -614,49 +578,6 @@ function ProfilePage() {
             />
           )}
 
-          {messageModalOpen && (
-            <div className="message-modal-backdrop" onClick={handleCloseMessageModal}>
-              <section
-                className="message-modal"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <h2>Mesaj gönder</h2>
-
-                <p>
-                  <strong>{profileUser.full_name}</strong> kullanıcısına mesaj gönder.
-                </p>
-
-                <form onSubmit={handleSendProfileMessage}>
-                  <textarea
-                    value={messageText}
-                    onChange={(event) => setMessageText(event.target.value)}
-                    placeholder="Mesaj yaz..."
-                    maxLength={1000}
-                    autoFocus
-                  />
-
-                  <div className="message-modal-actions">
-                    <button
-                      type="button"
-                      className="confirm-cancel-button"
-                      onClick={handleCloseMessageModal}
-                      disabled={messageSending}
-                    >
-                      İptal
-                    </button>
-
-                    <button
-                      type="submit"
-                      className="confirm-delete-button message-send-button"
-                      disabled={!messageText.trim() || messageSending}
-                    >
-                      {messageSending ? "Gönderiliyor..." : "Gönder"}
-                    </button>
-                  </div>
-                </form>
-              </section>
-            </div>
-          )}
 
           {unfollowModalOpen && (
             <DeleteEntryConfirmModal
