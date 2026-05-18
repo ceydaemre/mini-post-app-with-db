@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { getUnreadNotificationsCount } from "../api/notificationApi.js";
+import MessagesDock from "../components/MessagesDock.jsx";
 import postitLogo from "../assets/postit-logo.png";
 
 function MainLayout({ children }) {
@@ -90,6 +91,8 @@ function MainLayout({ children }) {
       </aside>
 
       <main className="main-content">{children}</main>
+
+      <MessagesDock />
     </div>
   );
 }

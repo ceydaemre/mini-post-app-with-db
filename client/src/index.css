@@ -3799,3 +3799,335 @@ textarea {
   background: #0f172a;
   color: #ffffff;
 }
+
+.messages-dock {
+  position: fixed;
+  right: 34px;
+  bottom: 34px;
+  z-index: 35;
+}
+
+.messages-dock-launcher {
+  width: 86px;
+  height: 86px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.2);
+  cursor: pointer;
+}
+
+.messages-dock-launcher img {
+  width: 78px;
+  height: 78px;
+  object-fit: contain;
+}
+
+.messages-dock-panel {
+  position: absolute;
+  right: 0;
+  bottom: 102px;
+  width: 360px;
+  height: 520px;
+  border: 1px solid #e5e7eb;
+  border-radius: 26px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  box-shadow: 0 24px 90px rgba(15, 23, 42, 0.22);
+}
+
+.messages-dock-header {
+  min-height: 62px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #ffffff;
+}
+
+.messages-dock-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #111827;
+}
+
+.messages-dock-user-header {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.messages-dock-user-header span,
+.messages-dock-conversation span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.messages-dock-user-header strong,
+.messages-dock-conversation strong {
+  color: #111827;
+  font-size: 14px;
+}
+
+.messages-dock-user-header small,
+.messages-dock-conversation small {
+  color: #64748b;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.messages-dock-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.messages-dock-header-actions button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #f1f5f9;
+  color: #111827;
+  cursor: pointer;
+}
+
+.messages-dock-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.messages-dock-conversation {
+  width: 100%;
+  border: 0;
+  border-radius: 16px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.messages-dock-conversation:hover {
+  background: #f8fafc;
+}
+
+.messages-dock-conversation em {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.messages-dock-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.messages-dock-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.messages-dock-empty,
+.messages-dock-error {
+  margin: 18px;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
+.messages-dock-error {
+  color: #dc2626;
+}
+
+.messages-dock-search {
+  margin: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.messages-dock-search input {
+  width: 100%;
+  border: 0;
+  padding: 11px 0;
+  outline: none;
+  font: inherit;
+}
+
+.messages-dock-thread {
+  flex: 1;
+  min-height: 0;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  background: #fbfdff;
+}
+
+.messages-dock-thread::before {
+  content: "";
+  margin-top: auto;
+}
+
+.messages-dock-message-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.messages-dock-message-row.mine {
+  justify-content: flex-end;
+}
+
+.messages-dock-message {
+  max-width: 78%;
+  border: 1px solid #e5e7eb;
+  border-radius: 17px;
+  padding: 9px 11px;
+  background: #ffffff;
+  color: #111827;
+}
+
+.messages-dock-message-row.mine .messages-dock-message {
+  border-color: #111827;
+  background: #111827;
+  color: #ffffff;
+}
+
+.messages-dock-message p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.messages-dock-message small {
+  display: block;
+  margin-top: 4px;
+  opacity: 0.65;
+  font-size: 10px;
+  text-align: right;
+}
+
+.messages-dock-compose {
+  border-top: 1px solid #f1f5f9;
+  padding: 10px;
+  display: flex;
+  gap: 8px;
+  background: #ffffff;
+}
+
+.messages-dock-compose input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.messages-dock-compose button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0 13px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.messages-dock-compose button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.messages-dock-full-link {
+  border: 0;
+  border-top: 1px solid #f1f5f9;
+  padding: 10px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.messages-dock-header-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.messages-dock-back-button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: #f1f5f9;
+  color: #111827;
+  cursor: pointer;
+}
+
+.messages-dock-back-button:hover,
+.messages-dock-header-actions button:hover {
+  background: #e5e7eb;
+}
+
+.messages-dock-user-header {
+  flex: 1;
+}
+
+.messages-dock-conversation {
+  min-height: 58px;
+}
+
+.messages-dock-search input::placeholder {
+  color: #94a3b8;
+}
