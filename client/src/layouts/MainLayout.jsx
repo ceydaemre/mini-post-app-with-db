@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { getUnreadNotificationsCount } from "../api/notificationApi.js";
+import { getUnreadMessagesCount } from "../api/messageApi.js";
 import MessagesDock from "../components/MessagesDock.jsx";
 import postitLogo from "../assets/postit-logo.png";
 
@@ -10,6 +11,7 @@ function MainLayout({ children }) {
   const location = useLocation();
   const user = JSON.parse(localStorage.getItem("user"));
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   function handleLogout() {
     localStorage.removeItem("token");
@@ -44,8 +46,40 @@ function MainLayout({ children }) {
   }, [user?.id]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    async function fetchUnreadMessagesCount() {
+      if (!user) return;
+
+      try {
+        const result = await getUnreadMessagesCount();
+
+        if (!isMounted) return;
+
+        setUnreadMessagesCount(result?.data?.unread_count || 0);
+      } catch {
+        if (!isMounted) return;
+
+        setUnreadMessagesCount(0);
+      }
+    }
+
+    fetchUnreadMessagesCount();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
     if (location.pathname === "/notifications") {
       setUnreadNotificationsCount(0);
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (location.pathname.startsWith("/messages")) {
+      setUnreadMessagesCount(0);
     }
   }, [location.pathname]);
 
@@ -71,7 +105,15 @@ function MainLayout({ children }) {
                 </span>
               )}
             </Link>
-            <Link to="/messages">Messages</Link>
+            <Link to="/messages" className="sidebar-nav-notification-link">
+              <span>Messages</span>
+
+              {unreadMessagesCount > 0 && (
+                <span className="sidebar-notification-badge">
+                  {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
+                </span>
+              )}
+            </Link>
             {user && <Link to={`/users/${user.id}`}>Profile</Link>}
           </nav>
         </div>
