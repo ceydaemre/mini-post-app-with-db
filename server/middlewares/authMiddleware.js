@@ -63,7 +63,7 @@ async function optionalAuthMiddleware(req, res, next) {
     } catch(error) {
 
         return res.status(401).json({
-            message : "Geçersiz veya süresi doğmuş token."
+            message : "Geçersiz veya süresi dolmuş token."
         });
 
     }
