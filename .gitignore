@@ -19,3 +19,6 @@ server/node_modules/
 .env
 client/.env
 server/.env
+*.sql
+postit-schema*.sql
+postit-full-backup*.sql
