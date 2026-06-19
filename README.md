@@ -427,7 +427,15 @@ PORT=3001
 
 ## Running the Project
 
-### Start backend
+The project is deployed and can be accessed online:
+
+**Live Demo:** https://mini-post-app-with-db.vercel.app/
+
+### Local Development
+
+If you want to run the project locally, follow the steps below.
+
+#### 1) Start the backend
 
 From the project root:
 
@@ -435,16 +443,29 @@ From the project root:
 npm run dev
 ```
 
-### Start frontend
+The backend will run on:
 
-From the `client` folder:
+```bash
+http://localhost:3001
+```
+
+#### 2) Start the frontend
+
+Open a new terminal and go to the `client` folder:
 
 ```bash
 cd client
 npm run dev
 ```
 
-Then open the frontend in your browser.
+The frontend will run on the local Vite development URL shown in the terminal.
+
+### Deployment
+
+The frontend is deployed on **Vercel**.
+
+In production, the frontend uses the deployed API instead of the local backend URL.
+For local development, the API base URL can still be configured with environment variables.
 
 ---
 
